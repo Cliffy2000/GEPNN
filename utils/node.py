@@ -4,7 +4,7 @@ class Node:
         self.weight     = weight
         self.bias       = bias
         self.children   = []
-        self.prev_value = 0
+        self.prev_value = 0.0  
         self.value      = None
         self.position   = position
 
@@ -15,4 +15,5 @@ class Node:
         self.value = None
 
     def update_prev(self):
-        self.prev_value = self.value
+        if self.value is not None:
+            self.prev_value = self.value
