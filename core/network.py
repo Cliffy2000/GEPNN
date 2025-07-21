@@ -4,7 +4,7 @@ from primitives.functions import get_functions
 from primitives.terminals import InputTerminal, IndexTerminal
 from utils.node import Node
 
-
+'''
 class Network:
     def __init__(self, individual):
         # Get function arities
@@ -219,3 +219,9 @@ class Network:
                 print(f"    Normal children: {[self.nodes.index(c) for c in node.children]}")
             if hasattr(node, 'ref_children'):
                 print(f"    Reference children: {[self.nodes.index(c) for c in node.ref_children]}")
+
+'''
+
+class Network:
+    def __init__(self, individual):
+
