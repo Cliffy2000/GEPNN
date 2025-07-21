@@ -1,12 +1,14 @@
 class Node:
-    def __init__(self, symbol, weight=None, bias=None, position=None):
-        self.symbol     = symbol
-        self.weight     = weight
-        self.bias       = bias
-        self.children   = []
-        self.prev_value = 0.0  
-        self.value      = None
-        self.position   = position
+    def __init__(self, symbol, weight=None, bias=None):
+        self.symbol = symbol
+        self.weight = weight
+        self.bias = bias
+        self.children = []
+        self.ref_children = []
+        self.ref_weights = []
+        self.node_index = None
+        self.prev_value = 0.0
+        self.value = None
 
     def add_child(self, node):
         self.children.append(node)
