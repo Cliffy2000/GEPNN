@@ -4,223 +4,6 @@ from primitives.functions import get_functions
 from primitives.terminals import InputTerminal, IndexTerminal
 from utils.node import Node
 
-'''
-class Network:
-    def __init__(self, individual):
-        # Get function arities
-        funcs, arities = zip(*get_functions())
-        self.func_arity = dict(zip(funcs, arities))
-
-        # Get expression and parameters
-        self.expression = individual.get_expression()
-        self.weights = individual.weights
-        self.biases = individual.biases
-        self.head_length = individual.head_length
-
-        # Build tree structure
-        self.nodes = []
-        self.root = self._build_tree()
-
-    def _build_tree(self):
-        """Build tree using standard GEP parsing.
-        Stop when tree is complete. IndexTerminals don't consume positions.
-        """
-        if not self.expression:
-            return None
-
-        # Create root
-        root_symbol = self.expression[0]
-        root = Node(root_symbol, position=0)
-        self.nodes.append(root)
-
-        # Track assignments
-        weight_idx = 0
-        bias_idx = 0
-
-        # Assign bias to root if it's a function
-        if root_symbol in self.func_arity:
-            root.bias = self.biases[bias_idx] if bias_idx < len(self.biases) else 0.0
-            bias_idx += 1
-
-        # Queue: (parent_node, remaining_children)
-        queue = collections.deque()
-        if root_symbol in self.func_arity:
-            queue.append((root, self.func_arity[root_symbol]))
-
-        # Parse expression
-        expr_idx = 1
-
-        while queue and expr_idx < len(self.expression):
-            parent, remaining = queue.popleft()
-
-            if remaining == 0:
-                continue
-
-            # Process one child
-            symbol = self.expression[expr_idx]
-
-            if isinstance(symbol, IndexTerminal):
-                # Reference to existing node - doesn't consume a tree position
-                ref_idx = symbol.index
-
-                # Store the reference for later resolution if node doesn't exist yet
-                if not hasattr(parent, 'pending_refs'):
-                    parent.pending_refs = []
-                parent.pending_refs.append((ref_idx, weight_idx))
-                weight_idx += 1
-
-                # Put parent back with one less child needed
-                if remaining > 1:
-                    queue.appendleft((parent, remaining - 1))
-
-                # Move to next expression position
-                expr_idx += 1
-
-            else:
-                # Create new node for function or terminal
-                child = Node(symbol, position=len(self.nodes))
-                self.nodes.append(child)
-
-                # Add as normal child with weight
-                child.weight = self.weights[weight_idx] if weight_idx < len(self.weights) else 1.0
-                weight_idx += 1
-                parent.add_child(child)
-
-                # If child is a function, assign bias and add to queue
-                if symbol in self.func_arity:
-                    child.bias = self.biases[bias_idx] if bias_idx < len(self.biases) else 0.0
-                    bias_idx += 1
-                    queue.append((child, self.func_arity[symbol]))
-
-                # Put parent back if more children needed
-                if remaining > 1:
-                    queue.appendleft((parent, remaining - 1))
-
-                # Move to next expression position
-                expr_idx += 1
-
-        # Post-process: Resolve all pending references
-        for node in self.nodes:
-            if hasattr(node, 'pending_refs'):
-                if not hasattr(node, 'ref_children'):
-                    node.ref_children = []
-                    node.ref_weights = []
-
-                for ref_idx, weight_idx in node.pending_refs:
-                    if 0 <= ref_idx < len(self.nodes):
-                        ref_node = self.nodes[ref_idx]
-                        node.ref_children.append(ref_node)
-                        node.ref_weights.append(self.weights[weight_idx] if weight_idx < len(self.weights) else 1.0)
-
-                # Clean up
-                delattr(node, 'pending_refs')
-
-        return root
-
-    def forward(self, inputs):
-        """Execute forward pass through the network."""
-        # Convert inputs to tensor format if needed
-        if isinstance(inputs, dict):
-            input_tensors = {k: v if torch.is_tensor(v) else torch.tensor(v, dtype=torch.float32)
-                             for k, v in inputs.items()}
-        else:
-            input_tensors = inputs if torch.is_tensor(inputs) else torch.tensor(inputs, dtype=torch.float32)
-
-        # Reset all node values
-        for node in self.nodes:
-            node.reset()
-
-        # Evaluate the tree
-        output = self._evaluate(self.root, input_tensors)
-
-        # Update previous values for recurrence
-        for node in self.nodes:
-            node.update_prev()
-
-        return output
-
-    def _evaluate(self, node, inputs):
-        """Recursively evaluate a node."""
-        # Check if already computed
-        if node.value is not None:
-            return node.value
-
-        symbol = node.symbol
-
-        # Handle terminals
-        if isinstance(symbol, InputTerminal):
-            # Get input value
-            if isinstance(inputs, dict):
-                value = inputs.get(f'x{symbol.index}', torch.tensor(0.0))
-            else:
-                value = inputs[symbol.index] if symbol.index < len(inputs) else torch.tensor(0.0)
-            node.value = value
-            return value
-
-        # Handle functions
-        elif symbol in self.func_arity:
-            # Evaluate all children (both normal and reference)
-            child_values = []
-
-            # Normal children
-            for child in node.children:
-                child_value = self._evaluate(child, inputs)
-                weighted_value = child_value * child.weight
-                child_values.append(weighted_value)
-
-            # Reference children (from IndexTerminals)
-            if hasattr(node, 'ref_children'):
-                for ref_child, ref_weight in zip(node.ref_children, node.ref_weights):
-                    # Check if reference creates a cycle
-                    if ref_child.value is None and ref_child.position <= node.position:
-                        # Recurrent connection - use previous value
-                        if torch.is_tensor(ref_child.prev_value):
-                            ref_value = ref_child.prev_value.detach().clone()
-                        else:
-                            ref_value = torch.tensor(ref_child.prev_value, dtype=torch.float32)
-                    else:
-                        # Forward reference or already computed
-                        ref_value = self._evaluate(ref_child, inputs)
-                    weighted_value = ref_value * ref_weight
-                    child_values.append(weighted_value)
-
-            # Apply function
-            if child_values:
-                result = symbol(*child_values)
-                # Add bias
-                if node.bias is not None:
-                    result = result + node.bias
-            else:
-                result = torch.tensor(0.0)
-
-            node.value = result
-            return result
-
-        else:
-            # Unknown symbol type
-            node.value = torch.tensor(0.0)
-            return node.value
-
-    def get_active_parameters(self):
-        """Get count of weights and biases actually used in the network."""
-        active_weights = sum(1 for node in self.nodes if node.weight is not None)
-        for node in self.nodes:
-            if hasattr(node, 'ref_weights'):
-                active_weights += len(node.ref_weights)
-        active_biases = sum(1 for node in self.nodes if node.bias is not None)
-        return active_weights, active_biases
-
-    def print_structure(self):
-        """Print the network structure for debugging."""
-        print(f"Network has {len(self.nodes)} active nodes:")
-        for i, node in enumerate(self.nodes):
-            print(f"  Node {i}: {node.symbol}")
-            if node.children:
-                print(f"    Normal children: {[self.nodes.index(c) for c in node.children]}")
-            if hasattr(node, 'ref_children'):
-                print(f"    Reference children: {[self.nodes.index(c) for c in node.ref_children]}")
-
-'''
 
 class Network:
     def __init__(self, individual):
@@ -231,7 +14,7 @@ class Network:
         self.expression = individual.expression
         self.head_length = individual.head_length
         self.num_inputs = individual.num_inputs
-        self.weights = list(individual.weights)     # NOTE: using deeper copy just in case
+        self.weights = list(individual.weights)  # NOTE: using deeper copy just in case
         self.biases = list(individual.biases)
 
         self.nodes = []
@@ -241,6 +24,14 @@ class Network:
         """Build tree using standard GEP parsing with IndexTerminals as edges."""
         if not self.expression:
             return None
+
+        # Check if first element is IndexTerminal - invalid expression
+        if isinstance(self.expression[0], IndexTerminal):
+            # Create a dummy node that returns 0
+            dummy = Node(lambda: torch.tensor(0.0, dtype=torch.float32))
+            dummy.node_index = 0
+            self.nodes.append(dummy)
+            return dummy
 
         # Create ALL nodes first (except IndexTerminals)
         for i, symbol in enumerate(self.expression):
@@ -256,7 +47,7 @@ class Network:
                 node.bias = self.biases[bias_idx] if bias_idx < len(self.biases) else 0.0
                 bias_idx += 1
 
-        # Now build connections
+        # Now build connections using sequential GEP parsing
         root = self.nodes[0]
         weight_idx = 0
 
@@ -268,67 +59,58 @@ class Network:
                 expr_to_node[i] = node_idx
                 node_idx += 1
 
-        # Queue: (parent_node, expr_positions_to_process)
+        # Initialize reference storage
+        for node in self.nodes:
+            node.ref_children = []
+            node.ref_weights = []
+
+        # Queue: (parent_node, remaining_arity)
         queue = collections.deque()
         if root.symbol in self.func_arity:
-            arity = self.func_arity[root.symbol]
-            child_positions = list(range(1, min(1 + arity, len(self.expression))))
-            if child_positions:
-                queue.append((root, child_positions))
+            queue.append((root, self.func_arity[root.symbol]))
 
-        # Track pending references
-        pending_refs = collections.defaultdict(list)
+        # Sequential parsing: process expression positions one by one
+        expr_idx = 1
 
-        while queue:
-            parent, positions = queue.popleft()
+        while queue and expr_idx < len(self.expression):
+            parent, remaining_arity = queue.popleft()
 
-            for pos in positions:
-                if pos >= len(self.expression):
-                    break
+            if remaining_arity == 0:
+                continue
 
-                symbol = self.expression[pos]
+            # Process one position for this parent
+            symbol = self.expression[expr_idx]
 
-                if isinstance(symbol, IndexTerminal):
-                    # Reference edge - store for later
-                    weight = self.weights[weight_idx] if weight_idx < len(self.weights) else 1.0
-                    weight_idx += 1
-                    pending_refs[parent].append((symbol.index, weight))
-                else:
-                    # Normal child
-                    child_node_idx = expr_to_node[pos]
-                    child = self.nodes[child_node_idx]
-                    child.weight = self.weights[weight_idx] if weight_idx < len(self.weights) else 1.0
-                    weight_idx += 1
-                    parent.children.append(child)
+            if isinstance(symbol, IndexTerminal):
+                # Reference edge - add directly to parent
+                weight = self.weights[weight_idx] if weight_idx < len(self.weights) else 1.0
+                weight_idx += 1
 
-                    # If child is a function, find its children
-                    if child.symbol in self.func_arity:
-                        arity = self.func_arity[child.symbol]
-                        # Find next positions after current batch
-                        next_start = max(positions) + 1
-                        child_positions = []
-
-                        # Scan forward to find positions for this child
-                        scan_pos = next_start
-                        found = 0
-                        while found < arity and scan_pos < len(self.expression):
-                            child_positions.append(scan_pos)
-                            # Skip the position but count it as consuming a child slot
-                            found += 1
-                            scan_pos += 1
-
-                        if child_positions:
-                            queue.append((child, child_positions))
-
-        # Resolve all pending references
-        for parent, refs in pending_refs.items():
-            for target_idx, weight in refs:
-                if target_idx < len(self.nodes):
-                    parent.ref_children.append(self.nodes[target_idx])
+                # Add reference if target exists
+                if symbol.index < len(self.nodes):
+                    parent.ref_children.append(self.nodes[symbol.index])
                     parent.ref_weights.append(weight)
+            else:
+                # Normal child node
+                child_node_idx = expr_to_node[expr_idx]
+                child = self.nodes[child_node_idx]
+                child.weight = self.weights[weight_idx] if weight_idx < len(self.weights) else 1.0
+                weight_idx += 1
+                parent.children.append(child)
+
+                # If child is a function, add it to end of queue
+                if child.symbol in self.func_arity:
+                    queue.append((child, self.func_arity[child.symbol]))
+
+            # Decrement remaining arity and put parent back if needed
+            remaining_arity -= 1
+            if remaining_arity > 0:
+                queue.appendleft((parent, remaining_arity))
+
+            # Move to next position
+            expr_idx += 1
 
         return root
-
 
     def forward(self, inputs):
         """Execute forward pass through the network."""

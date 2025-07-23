@@ -220,10 +220,10 @@ class TestNetwork(unittest.TestCase):
         # Expression parsing:
         # 0: add (root) - needs 2 children
         # 1: x0 (first child of root)
-        # 2: @3 (reference to future node 3)
-        # 3: multiply (created to satisfy @3 reference) - needs 2 children
-        # 4: x1 (first child of multiply)
-        # 5: x2 (second child of multiply)
+        # 2: @3 (reference to node 3 - but node 3 will be x1, not multiply!)
+        # 3: multiply (node 2) - needs 2 children
+        # 4: x1 (node 3)
+        # 5: x2 (node 4)
 
         chromosome = [
             # Head
@@ -242,25 +242,25 @@ class TestNetwork(unittest.TestCase):
                          num_biases=2, chromosome=chromosome)
         network = Network(ind)
 
-        # Should create 6 nodes total
+        # Should create 15 nodes total (all non-IndexTerminal positions)
         self.assertEqual(15, len(network.nodes))
 
         # Verify node structure
         self.assertEqual(add, network.nodes[0].symbol)  # root
         self.assertEqual('x0', network.nodes[1].symbol.name)
-        self.assertEqual(multiply, network.nodes[3].symbol)
-        self.assertEqual('x1', network.nodes[4].symbol.name)
-        self.assertEqual('x2', network.nodes[5].symbol.name)
+        self.assertEqual(multiply, network.nodes[2].symbol)  # multiply is node 2, not 3!
+        self.assertEqual('x1', network.nodes[3].symbol.name)  # x1 is node 3
+        self.assertEqual('x2', network.nodes[4].symbol.name)
 
         # Test computation with x0=2, x1=3, x2=4
-        # multiply: (x1*3 + x2*4) + 10 = (3*3 + 4*4) + 10 = 9 + 16 + 10 = 35
-        # add: (x0*1 + @3*2) + 5 = (2*1 + 35*2) + 5 = 2 + 70 + 5 = 77
+        # add gets: x0 as child, @3 (which is x1) as reference
+        # add: (x0*1 + x1*2) + 5 = (2*1 + 3*2) + 5 = 2 + 6 + 5 = 13
         result = network.forward({'x0': 2.0, 'x1': 3.0, 'x2': 4.0})
-        self.assertEqual(77.0, result.item())
+        self.assertEqual(13.0, result.item())
 
         # Verify the forward reference was resolved
         self.assertEqual(1, len(network.root.ref_children))
-        self.assertEqual(network.nodes[3], network.root.ref_children[0])
+        self.assertEqual(network.nodes[3], network.root.ref_children[0])  # @3 references node 3 (x1)
 
 if __name__ == '__main__':
     unittest.main()
