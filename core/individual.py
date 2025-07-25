@@ -9,7 +9,7 @@ class Individual:
         self.num_inputs = num_inputs
         self.num_weights = num_weights
         self.num_biases = num_biases
-        self.fitness = 0.0
+        self.fitness = None
 
         max_arity = max(arity for _, arity in get_functions())      # NOTE: potentially move outside of init for slight optimization
         self.tail_length = head_length * (max_arity - 1) + 1

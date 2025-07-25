@@ -1,269 +1,232 @@
-import torch
+import random
+import numpy as np
+from deap import base, creator, tools, algorithms
 from core.individual import Individual
 from core.network import Network
-from primitives.functions import add
-from primitives.terminals import InputTerminal, IndexTerminal
-from utils.output_utils import (
-    print_separator, print_section_break, print_header,
-    print_test_info, print_calculation_step, print_result, print_tree_structure
-)
+from core.operators import crossover_one_point, mutate
+from utils.output_utils import print_header, print_section_break, format_list
+
+# GA Parameters
+POPULATION_SIZE = 100
+N_GENERATIONS = 50
+CXPB = 0.7  # Crossover probability
+MUTPB = 0.2  # Mutation probability
+TOURNSIZE = 3  # Tournament selection size
+
+# GEP Parameters
+HEAD_LENGTH = 10
+NUM_INPUTS = 3
+NUM_WEIGHTS = 30
+NUM_BIASES = 10
+
+# Create DEAP types
+creator.create("FitnessMax", base.Fitness, weights=(1.0,))
+creator.create("GEPIndividual", Individual, fitness=creator.FitnessMax)
+
+# Initialize toolbox
+toolbox = base.Toolbox()
 
 
-def test_simple_add():
-    """Test the simplest case: add(x0, x1)"""
-    print_header("Test 1: Simple Addition", level=1)
-    print_tree_structure("add(x0, x1)")
-
-    # For head_length=3, max_arity=3, tail_length = 3*(3-1)+1 = 7
-    # Create chromosome manually
-    chromosome = [
-        # Head (3)
-        add, InputTerminal(0), InputTerminal(1),
-        # Tail (7) - must be terminals only
-        InputTerminal(0), InputTerminal(1), InputTerminal(0), InputTerminal(1),
-        InputTerminal(0), InputTerminal(1), InputTerminal(0),
-        # Weights (2)
-        2.0, 3.0,
-        # Biases (1)
-        10.0
-    ]
-
-    # Create individual from chromosome
-    individual = Individual.from_chromosome(
-        chromosome=chromosome,
-        head_length=3,
-        num_inputs=2,
-        num_weights=2,
-        num_biases=1
+def create_individual():
+    """Create a GEP individual with random initialization."""
+    ind = creator.GEPIndividual(
+        head_length=HEAD_LENGTH,
+        num_inputs=NUM_INPUTS,
+        num_weights=NUM_WEIGHTS,
+        num_biases=NUM_BIASES
     )
+    # Initialize the fitness attribute
+    ind.fitness = creator.FitnessMax()
+    return ind
 
-    # Create network
+
+def evaluate_individual(individual):
+    """
+    Placeholder fitness function that evaluates an individual.
+    Returns a tuple as required by DEAP.
+    """
+    # Create network from individual
     network = Network(individual)
 
-    # Test Case 1
-    print_header("Test Case 1.1", level=2)
-    inputs = {'x0': 5.0, 'x1': 7.0}
-    print_test_info(inputs, individual.weights, individual.biases)
+    # Generate some test inputs
+    test_inputs = {f'x{i}': random.random() for i in range(NUM_INPUTS)}
 
-    output = network.forward(inputs)
+    try:
+        # Run the network
+        output = network.forward(test_inputs)
 
-    print_calculation_step(
-        1, "Apply weights to inputs",
-        "(x0 × w0) + (x1 × w1) = (5 × 2) + (7 × 3)",
-        "10 + 21 = 31"
+        # Placeholder: return random fitness between 0 and 1
+        fitness = random.random()
+
+        # You can use the output in your actual fitness calculation
+        # For example: fitness = abs(output.item()) if torch.is_tensor(output) else abs(output)
+
+    except Exception as e:
+        # Handle any errors in network execution
+        fitness = 0.0
+        print(f"Error evaluating individual: {e}")
+
+    return (fitness,)  # Must return a tuple
+
+
+def crossover_wrapper(ind1, ind2):
+    """Wrapper for crossover that maintains DEAP compatibility."""
+    # Perform crossover
+    offspring1, offspring2 = crossover_one_point(ind1, ind2)
+
+    # Create new DEAP individuals from offspring
+    new_ind1 = creator.GEPIndividual(
+        head_length=offspring1.head_length,
+        num_inputs=offspring1.num_inputs,
+        num_weights=offspring1.num_weights,
+        num_biases=offspring1.num_biases,
+        chromosome=offspring1.gene
     )
-    print_calculation_step(
-        2, "Add bias",
-        "31 + bias",
-        "31 + 10 = 41"
+    new_ind2 = creator.GEPIndividual(
+        head_length=offspring2.head_length,
+        num_inputs=offspring2.num_inputs,
+        num_weights=offspring2.num_weights,
+        num_biases=offspring2.num_biases,
+        chromosome=offspring2.gene
     )
 
-    print_result(41.0, output.item())
+    # Initialize fitness attributes
+    new_ind1.fitness = creator.FitnessMax()
+    new_ind2.fitness = creator.FitnessMax()
 
-    # Test Case 2
-    print_header("Test Case 1.2", level=2)
-    inputs2 = {'x0': 1.0, 'x1': 2.0}
-    print_test_info(inputs2, individual.weights, individual.biases)
+    return new_ind1, new_ind2
 
-    output2 = network.forward(inputs2)
 
-    print_calculation_step(
-        1, "Apply weights to inputs",
-        "(x0 × w0) + (x1 × w1) = (1 × 2) + (2 × 3)",
-        "2 + 6 = 8"
+def mutation_wrapper(ind):
+    """Wrapper for mutation that maintains DEAP compatibility."""
+    # Perform mutation
+    mutated = mutate(ind)
+
+    # Create new DEAP individual from mutated
+    new_ind = creator.GEPIndividual(
+        head_length=mutated.head_length,
+        num_inputs=mutated.num_inputs,
+        num_weights=mutated.num_weights,
+        num_biases=mutated.num_biases,
+        chromosome=mutated.gene
     )
-    print_calculation_step(
-        2, "Add bias",
-        "8 + bias",
-        "8 + 10 = 18"
-    )
 
-    print_result(18.0, output2.item())
+    # Initialize fitness attribute
+    new_ind.fitness = creator.FitnessMax()
+
+    return (new_ind,)  # Must return a tuple containing the individual
 
 
-def test_index_terminal():
-    """Test with index terminal: add(add(x0, x1), @2)"""
+# Register functions with toolbox
+toolbox.register("individual", create_individual)
+toolbox.register("population", tools.initRepeat, list, toolbox.individual)
+toolbox.register("evaluate", evaluate_individual)
+toolbox.register("mate", crossover_wrapper)
+toolbox.register("mutate", mutation_wrapper)
+toolbox.register("select", tools.selTournament, tournsize=TOURNSIZE)
+
+
+def main():
+    """Main evolutionary algorithm loop."""
+    print_header("GEP EVOLUTIONARY ALGORITHM", level=1)
+    print(f"Population Size: {POPULATION_SIZE}")
+    print(f"Generations: {N_GENERATIONS}")
+    print(f"Head Length: {HEAD_LENGTH}")
+    print(f"Number of Inputs: {NUM_INPUTS}")
+    print(f"Crossover Probability: {CXPB}")
+    print(f"Mutation Probability: {MUTPB}")
+
+    # Create initial population
     print_section_break()
-    print("Test 2: Index Terminal - add(add(x0, x1), @2)")
-    print_separator()
+    print("Creating initial population...")
+    population = toolbox.population(n=POPULATION_SIZE)
 
-    # For head_length=5, max_arity=3, tail_length = 5*(3-1)+1 = 11
-    # Position: 0    1    2   3   4
-    # Symbols: add, add, x0, x1, @2
-    chromosome = [
-        # Head (5)
-        add, add, InputTerminal(0), InputTerminal(1), IndexTerminal(2),
-        # Tail (11) - terminals only
-        InputTerminal(0), InputTerminal(1), InputTerminal(0), InputTerminal(1),
-        InputTerminal(0), InputTerminal(1), InputTerminal(0), InputTerminal(1),
-        InputTerminal(0), InputTerminal(1), InputTerminal(0),
-        # Weights (4)
-        2.0, 3.0, 4.0, 5.0,
-        # Biases (2)
-        100.0, 200.0
-    ]
+    # Evaluate initial population
+    print("Evaluating initial population...")
+    fitnesses = list(map(toolbox.evaluate, population))
+    for ind, fit in zip(population, fitnesses):
+        ind.fitness.values = fit
 
-    individual = Individual.from_chromosome(
-        chromosome=chromosome,
-        head_length=5,
-        num_inputs=2,
-        num_weights=4,
-        num_biases=2
-    )
+    # Statistics
+    stats = tools.Statistics(lambda ind: ind.fitness.values)
+    stats.register("avg", np.mean)
+    stats.register("std", np.std)
+    stats.register("min", np.min)
+    stats.register("max", np.max)
 
-    print(f"Individual: {individual}")
+    # Hall of fame to track best individuals
+    hof = tools.HallOfFame(1)
 
-    # Create network
-    network = Network(individual)
+    # Evolution loop
+    print_section_break()
+    print("Starting evolution...")
 
-    # Test with inputs
-    inputs = {'x0': 1.0, 'x1': 1.0}
-    output = network.forward(inputs)
+    for gen in range(N_GENERATIONS):
+        # Select the next generation
+        offspring = toolbox.select(population, len(population))
+        offspring = list(map(toolbox.clone, offspring))
 
-    print(f"\nInputs: {inputs}")
-    print(f"Weights: {individual.weights}")
-    print(f"Biases: {individual.biases}")
+        # Apply crossover
+        for child1, child2 in zip(offspring[::2], offspring[1::2]):
+            if random.random() < CXPB:
+                child1_new, child2_new = toolbox.mate(child1, child2)
+                offspring[offspring.index(child1)] = child1_new
+                offspring[offspring.index(child2)] = child2_new
 
-    print("\nStep-by-step calculation:")
-    print("1. Inner add (position 1): add(x0*4, x1*5) + 200")
-    print(f"   = add(1*4, 1*5) + 200 = add(4, 5) + 200 = 9 + 200 = 209")
+        # Apply mutation
+        for mutant in offspring:
+            if random.random() < MUTPB:
+                mutated = toolbox.mutate(mutant)
+                offspring[offspring.index(mutant)] = mutated[0]
 
-    print("2. Position 2 (x0) value = 1")
+        # Evaluate offspring with invalid fitness
+        invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
+        fitnesses = map(toolbox.evaluate, invalid_ind)
+        for ind, fit in zip(invalid_ind, fitnesses):
+            ind.fitness.values = fit
 
-    print("3. Outer add (position 0): add(inner_add*2, x0*3) + 100")
-    print(f"   = add(209*2, 1*3) + 100 = add(418, 3) + 100 = 421 + 100 = 521")
+        # Replace population
+        population[:] = offspring
 
-    print(f"\nExpected: 521")
-    print(f"Output: {output.item()}")
+        # Update hall of fame
+        hof.update(population)
 
-    # Show network structure
-    print("\nNetwork structure:")
-    network.print_structure()
+        # Gather and print statistics
+        record = stats.compile(population)
+        print(f"\nGeneration {gen + 1}:")
+        print(f"  Min: {record['min']:.4f}")
+        print(f"  Max: {record['max']:.4f}")
+        print(f"  Avg: {record['avg']:.4f}")
+        print(f"  Std: {record['std']:.4f}")
 
+    # Print final results
+    print_section_break()
+    print_header("EVOLUTION COMPLETE", level=2)
+    print(f"\nBest individual found:")
+    best_ind = hof[0]
+    print(f"  Fitness: {best_ind.fitness.values[0]:.4f}")
+    print(f"\n  Expression: {best_ind}")
 
-def test_recurrent_connection():
-    """Test recurrent connection with index terminal"""
-    print_header("Test 3: Recurrent Connection", level=1)
-    print_tree_structure("add(x0, @0) where @0 creates a self-reference")
+    # Create and display the best network
+    best_network = Network(best_ind)
+    print("\nBest Network Structure:")
+    best_network.print_structure()
 
-    # For head_length=3, max_arity=3, tail_length = 3*(3-1)+1 = 7
-    chromosome = [
-        # Head (3)
-        add, InputTerminal(0), IndexTerminal(0),
-        # Tail (7)
-        InputTerminal(0), InputTerminal(1), InputTerminal(0), InputTerminal(1),
-        InputTerminal(0), InputTerminal(1), InputTerminal(0),
-        # Weights (2)
-        2.0, 3.0,
-        # Biases (1)
-        10.0
-    ]
+    # Test the best network
+    print_section_break()
+    print_header("TESTING BEST NETWORK", level=2)
+    test_inputs = {f'x{i}': random.random() for i in range(NUM_INPUTS)}
+    output = best_network.forward(test_inputs)
+    print(f"\nTest Input: {test_inputs}")
+    print(f"Network Output: {output}")
 
-    individual = Individual.from_chromosome(
-        chromosome=chromosome,
-        head_length=3,
-        num_inputs=2,
-        num_weights=2,
-        num_biases=1
-    )
-
-    network = Network(individual)
-
-    print("\nRecurrent Formula: output(t) = (x0 × 2) + (output(t-1) × 3) + 10")
-    print("Initial state: output(-1) = 0")
-
-    x0_values = [1.0, 2.0, 3.0]
-    expected_outputs = [12.0, 50.0, 166.0]
-
-    print_header("Time Series Evaluation", level=2)
-
-    for t, (x0, expected) in enumerate(zip(x0_values, expected_outputs)):
-        inputs = {'x0': x0, 'x1': 0.0}
-        output = network.forward(inputs)
-
-        print(f"\nTimestep {t}: x0 = {x0}")
-
-        if t == 0:
-            print("  Calculation: (1 × 2) + (0 × 3) + 10 = 2 + 0 + 10 = 12")
-        elif t == 1:
-            print("  Calculation: (2 × 2) + (12 × 3) + 10 = 4 + 36 + 10 = 50")
-        else:
-            print("  Calculation: (3 × 2) + (50 × 3) + 10 = 6 + 150 + 10 = 166")
-
-        print(f"  Output: {output.item():.1f} {'✓' if abs(output.item() - expected) < 0.001 else '✗'}")
-
-
-def test_complex_index():
-    """Test complex index case: add(add(x0, @4), add(x1, x2))"""
-    print_header("Test 4: Complex Tree with Forward Reference", level=1)
-    print_tree_structure("add(add(x0, @4), add(x1, x2)) where @4 references node 4 (x1)")
-
-    # For head_length=7, max_arity=3, tail_length = 7*(3-1)+1 = 15
-    chromosome = [
-        # Head (7)
-        add, add, add, InputTerminal(0), IndexTerminal(4), InputTerminal(1), InputTerminal(2),
-        # Tail (15)
-        InputTerminal(0), InputTerminal(1), InputTerminal(2), InputTerminal(0),
-        InputTerminal(1), InputTerminal(2), InputTerminal(0), InputTerminal(1),
-        InputTerminal(2), InputTerminal(0), InputTerminal(1), InputTerminal(2),
-        InputTerminal(0), InputTerminal(1), InputTerminal(2),
-        # Weights (6)
-        2.0, 3.0, 4.0, 5.0, 6.0, 7.0,
-        # Biases (3)
-        100.0, 200.0, 300.0
-    ]
-
-    individual = Individual.from_chromosome(
-        chromosome=chromosome,
-        head_length=7,
-        num_inputs=3,
-        num_weights=6,
-        num_biases=3
-    )
-
-    network = Network(individual)
-
-    inputs = {'x0': 1.0, 'x1': 2.0, 'x2': 3.0}
-    print_test_info(inputs, individual.weights, individual.biases)
-
-    output = network.forward(inputs)
-
-    print("\nNetwork Structure:")
-    network.print_structure()
-
-    print_header("Calculation Steps", level=2)
-    print("\nNote: @4 creates a forward reference to node 4 (x1)")
-
-    print_calculation_step(
-        1, "Left add (node 1)",
-        "add(x0×4, x1×5) + bias = add(1×4, 2×5) + 200",
-        "add(4, 10) + 200 = 14 + 200 = 214"
-    )
-
-    print_calculation_step(
-        2, "Right add (node 2)",
-        "add(x1×6, x2×7) + bias = add(2×6, 3×7) + 300",
-        "add(12, 21) + 300 = 33 + 300 = 333"
-    )
-
-    print_calculation_step(
-        3, "Root add (node 0)",
-        "add(left×2, right×3) + bias = add(214×2, 333×3) + 100",
-        "add(428, 999) + 100 = 1427 + 100 = 1527"
-    )
-
-    print_result(1527.0, output.item())
+    return population, hof
 
 
 if __name__ == "__main__":
-    print_header("GEPNN Network Testing Suite", level=1)
-    print("\nThis test suite demonstrates Gene Expression Programming Neural Networks (GEPNN)")
-    print("with support for index-based connections enabling skip and recurrent connections.")
+    random.seed(None)
+    # Run the GA
+    final_population, hall_of_fame = main()
 
-    test_simple_add()
-    test_index_terminal()
-    test_recurrent_connection()
-    test_complex_index()
-
-    print_section_break()
-    print("All tests completed successfully.")
+    print("\n" + "=" * 80)
+    print("Algorithm execution completed successfully!")

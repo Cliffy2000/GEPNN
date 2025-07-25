@@ -6,6 +6,10 @@ from utils.node import Node
 
 
 class Network:
+    """
+    This implementation treats the index terminal as an edge. As a result, the index terminal would not be considered in the node count.
+    The other approach would be to treat the index terminals as actual nodes in the tree, they will be leaves in the tree, and affect index counting.
+    """
     def __init__(self, individual):
         # TODO: move this to global scope for optimization
         funcs, arities = zip(*get_functions())
