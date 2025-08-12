@@ -1,6 +1,6 @@
 import random
-from core.individual import Individual
-from primitives.functions import get_functions
+from core.individual import Individual, Individual_xor
+from primitives.functions import get_functions, get_xor_functions
 from primitives.terminals import get_input_terminals, get_index_terminals
 
 _cache = {}
@@ -73,3 +73,48 @@ def mutate(indv: Individual):
         chromosome = new_gene
     )
 
+
+def _get_symbols_xor(head_length, num_inputs):
+    key = (head_length, num_inputs)
+    if key not in _cache:
+        functions = [f for f, _ in get_xor_functions()]
+        inputs = get_input_terminals(num_inputs)
+        indices = get_index_terminals(head_length)     # NOTE: potentially change to head_length + tail_length
+        _cache[key] = (functions, inputs, indices)
+    return _cache[key]
+
+
+def mutate_xor(indv: Individual):
+    """
+    The mutation operator if mutation takes place, operates on the head / tail / weights & biases separately
+    :param indv: Individual to mutate
+    :return: New individual
+    """
+    functions, inputs, indices = _get_symbols_xor(indv.head_length, indv.num_inputs)
+    tail_symbols = inputs       # NOTE: could be changed to inputs + indices
+
+    # Create new head with equal probability for each symbol type
+    new_head = []
+    for _ in range(indv.head_length):
+        symbol_type = random.choice(['function', 'input', 'index'])
+        if symbol_type == 'function':
+            new_head.append(random.choice(functions))
+        elif symbol_type == 'input':
+            new_head.append(random.choice(inputs))
+        else:  # index
+            new_head.append(random.choice(indices))
+
+    new_gene = (
+        new_head +
+        [random.choice(tail_symbols) for _ in indv.tail] +
+        [w + random.gauss(0, 1) for w in indv.weights] +
+        [b + random.gauss(0, 1) for b in indv.biases]
+    )
+
+    return Individual_xor(  # Use Individual_xor to maintain weights=1.0, biases=0.0
+        head_length = indv.head_length,
+        num_inputs = indv.num_inputs,
+        num_weights = indv.num_weights,
+        num_biases = indv.num_biases,
+        chromosome = new_gene
+    )

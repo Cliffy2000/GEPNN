@@ -5,7 +5,7 @@ from primitives.terminals import InputTerminal, IndexTerminal
 from utils.node import Node
 
 
-class Network:
+class Network_v0:
     """
     This implementation treats the index terminal as an edge. As a result, the index terminal would not be considered in the node count.
     The other approach would be to treat the index terminals as actual nodes in the tree, they will be leaves in the tree, and affect index counting.
@@ -190,6 +190,7 @@ class Network:
                 weighted_value = ref_value * ref_weight
                 child_values.append(weighted_value)
 
+
             # Apply function
             if child_values:
                 result = symbol(*child_values)
@@ -255,3 +256,246 @@ class Network:
                                          getattr(ref_child.symbol, 'name', str(ref_child.symbol)))
                     ref_info.append(f"{ref_child.node_index}:{ref_symbol} (w={weight:.3f})")
                 print(f"  References: {', '.join(ref_info)}")
+
+
+class Network:
+    def __init__(self, individual):
+        # TODO: move this to global scope for optimization
+        funcs, arities = zip(*get_functions())
+        self.func_arity = dict(zip(funcs, arities))
+
+        self.expression = individual.expression
+        self.head_length = individual.head_length
+        self.num_inputs = individual.num_inputs
+        self.weights = list(individual.weights)  # NOTE: using deeper copy just in case
+        self.biases = list(individual.biases)
+
+        self.nodes = []
+        self.root = self._build_tree()
+
+    def _build_tree(self):
+        """Build tree with IndexTerminals as nodes."""
+        if not self.expression:
+            return None
+
+        # Handle invalid expression starting with IndexTerminal
+        if isinstance(self.expression[0], IndexTerminal):
+            dummy = Node(lambda: torch.tensor(0.0, dtype=torch.float32))
+            dummy.node_index = 0
+            self.nodes.append(dummy)
+            return dummy
+
+        # Create all nodes
+        self.nodes = [Node(sym) for sym in self.expression]
+        for i, node in enumerate(self.nodes):
+            node.node_index = i
+
+        # Assign biases to function nodes only
+        bias_idx = 0
+        for node in self.nodes:
+            if node.symbol in self.func_arity:
+                node.bias = self.biases[bias_idx] if bias_idx < len(self.biases) else 0.0
+                bias_idx += 1
+
+        # Build tree structure using sequential parsing
+        root = self.nodes[0]
+        weight_idx = 0
+        expr_idx = 1
+
+        # Queue tracks (parent_node, remaining_children)
+        queue = collections.deque()
+        if root.symbol in self.func_arity:
+            queue.append((root, self.func_arity[root.symbol]))
+
+        while queue and expr_idx < len(self.expression):
+            parent, remaining = queue.popleft()
+
+            if remaining > 0:
+                # Connect child
+                child = self.nodes[expr_idx]
+                child.weight = self.weights[weight_idx] if weight_idx < len(self.weights) else 1.0
+                parent.children.append(child)
+
+                # Add child to queue if it's a function
+                if child.symbol in self.func_arity:
+                    queue.append((child, self.func_arity[child.symbol]))
+
+                # Update counters
+                weight_idx += 1
+                expr_idx += 1
+
+                # Re-queue parent if more children needed
+                if remaining > 1:
+                    queue.appendleft((parent, remaining - 1))
+
+        return root
+
+    def forward(self, inputs):
+        """Execute forward pass through the network."""
+        # Convert inputs to tensor format
+        if isinstance(inputs, dict):
+            for i in range(self.num_inputs):
+                if f'x{i}' not in inputs:
+                    raise ValueError(f"Missing input x{i}")
+            input_tensors = {
+                k: v if torch.is_tensor(v) else torch.tensor(v, dtype=torch.float32)
+                for k, v in inputs.items()
+            }
+        else:
+            if len(inputs) < self.num_inputs:
+                raise ValueError(f"Expected {self.num_inputs} inputs, got {len(inputs)}")
+            input_tensors = inputs if torch.is_tensor(inputs) else torch.tensor(inputs, dtype=torch.float32)
+
+        # Reset node values
+        for node in self.nodes:
+            node.value = None
+
+        # Evaluate root
+        output = self._evaluate(self.root, input_tensors)
+
+        # Update previous values for next timestep
+        for node in self.nodes:
+            if node.value is not None:
+                node.prev_value = node.value.item() if torch.is_tensor(node.value) else node.value
+
+        return output
+
+    def _evaluate(self, node, inputs):
+        """Recursively evaluate a node."""
+        # Return cached value if already computed
+        if node.value is not None:
+            return node.value
+
+        symbol = node.symbol
+
+        # Handle InputTerminal
+        if isinstance(symbol, InputTerminal):
+            if isinstance(inputs, dict):
+                value = inputs.get(f'x{symbol.index}', 0.0)
+            else:
+                value = inputs[symbol.index] if symbol.index < len(inputs) else 0.0
+            node.value = torch.tensor(value, dtype=torch.float32) if not torch.is_tensor(value) else value
+            return node.value
+
+        # Handle IndexTerminal (reference to another node)
+        if isinstance(symbol, IndexTerminal):
+            # Self-loop check
+            if symbol.index == node.node_index:
+                node.value = torch.tensor(0.0, dtype=torch.float32)
+                return node.value
+
+            if symbol.index >= len(self.nodes):
+                # Invalid reference
+                node.value = torch.tensor(0.0, dtype=torch.float32)
+                return node.value
+
+            target_node = self.nodes[symbol.index]
+
+            # Check for recurrence (referencing earlier or same node)
+            if target_node.value is None and target_node.node_index <= node.node_index:
+                # If target is InputTerminal, always use current value
+                if isinstance(target_node.symbol, InputTerminal):
+                    node.value = self._evaluate(target_node, inputs)
+                else:
+                    # Recurrent connection - use previous value
+                    prev_val = target_node.prev_value if hasattr(target_node, 'prev_value') else 0.0
+                    node.value = torch.tensor(prev_val, dtype=torch.float32)
+            else:
+                # Forward reference or already computed
+                node.value = self._evaluate(target_node, inputs)
+
+            return node.value
+
+        # Handle function nodes
+        if symbol in self.func_arity:
+            child_values = []
+
+            # Evaluate all children and apply weights
+            for child in node.children:
+                child_value = self._evaluate(child, inputs)
+                weighted_value = child_value * child.weight
+                child_values.append(weighted_value)
+
+            # Apply function
+            if child_values:
+                result = symbol(*child_values)
+                if node.bias is not None:
+                    result = result + node.bias
+                if not torch.is_tensor(result):
+                    result = torch.tensor(result, dtype=torch.float32)
+            else:
+                result = torch.tensor(0.0, dtype=torch.float32)
+
+            node.value = result
+            return result
+
+        # Unknown symbol type
+        node.value = torch.tensor(0.0, dtype=torch.float32)
+        return node.value
+
+    def print_tree(self):
+        """Print the tree structure in BFS order."""
+
+        def get_symbol_name(symbol):
+            if hasattr(symbol, '__name__'):
+                return symbol.__name__
+            if hasattr(symbol, 'name'):
+                return symbol.name
+            return str(symbol)
+
+        # Collect all active nodes via BFS
+        active_nodes = {}
+        queue = collections.deque([(self.root, None, 0)])  # (node, parent, depth)
+
+        while queue:
+            node, parent, depth = queue.popleft()
+
+            # Store node info
+            active_nodes[node.node_index] = {
+                'node': node,
+                'parent': parent,
+                'depth': depth,
+                'weight': node.weight if node != self.root else None
+            }
+
+            # Add children to queue
+            for child in node.children:
+                queue.append((child, node, depth + 1))
+
+        # Print nodes in index order
+        print("Network Tree Structure:")
+        for idx in sorted(active_nodes.keys()):
+            info = active_nodes[idx]
+            node = info['node']
+            indent = "  " * info['depth']
+            symbol_name = get_symbol_name(node.symbol)
+
+            # Build description
+            desc = f"{indent}[{idx}] {symbol_name}"
+
+            # Add weight
+            if info['weight'] is not None:
+                desc += f" (w={info['weight']:.3f})"
+
+            # Add bias
+            if node.symbol in self.func_arity and node.bias is not None:
+                desc += f" [b={node.bias:.3f}]"
+
+            # Parent info
+            if info['parent']:
+                desc += f" <- [{info['parent'].node_index}]"
+
+            # IndexTerminal target
+            if isinstance(node.symbol, IndexTerminal):
+                target_idx = node.symbol.index
+                if target_idx < len(self.nodes):
+                    target_name = get_symbol_name(self.nodes[target_idx].symbol)
+                    desc += f" -> {target_name}[{target_idx}]"
+                else:
+                    desc += f" -> invalid[{target_idx}]"
+
+            print(desc)
+
+        # Summary stats
+        active_weights, active_biases = self.get_active_parameters()
+        print(f"\nActive parameters: {active_weights} weights, {active_biases} biases")

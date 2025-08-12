@@ -1,109 +1,234 @@
-import torch
 import numpy as np
+import torch
 from sklearn.datasets import load_iris
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-from core.network import NetworkCompiler
-from .metrics import classification_error, accuracy, mean_squared_error
+from sklearn.metrics import accuracy_score
+from core.network import Network
+
+# Cache for dataset
+_dataset_cache = {}
 
 
-class IrisClassificationFitness:
-    def __init__(self):
-        self.load_data()
-        self.compiler = NetworkCompiler()
-
-    def load_data(self):
+def get_iris_data():
+    """Load and prepare Iris dataset."""
+    if 'iris' not in _dataset_cache:
+        # Load dataset
         iris = load_iris()
         X, y = iris.data, iris.target
 
+        # Split data
         X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.3, random_state=42, stratify=y
+            X, y, test_size=0.3, stratify=y
         )
 
+        # Standardize
         scaler = StandardScaler()
         X_train = scaler.fit_transform(X_train)
         X_test = scaler.transform(X_test)
 
-        self.X_train = torch.tensor(X_train, dtype=torch.float32)
-        self.X_test = torch.tensor(X_test, dtype=torch.float32)
-        self.y_train = torch.tensor(y_train, dtype=torch.long)
-        self.y_test = torch.tensor(y_test, dtype=torch.long)
+        _dataset_cache['iris'] = {
+            'X_train': X_train,
+            'X_test': X_test,
+            'y_train': y_train,
+            'y_test': y_test
+        }
 
-        self.num_classes = 3
-        self.input_size = 4
+    return _dataset_cache['iris']
 
-    def evaluate(self, chromosome):
+
+def evaluate_iris(individual):
+    """
+    Evaluate individual on Iris classification task.
+
+    Args:
+        individual: GEP individual to evaluate
+
+    Returns:
+        Tuple with accuracy score
+    """
+    data = get_iris_data()
+    X_train = data['X_train']
+    y_train = data['y_train']
+
+    # Create network
+    try:
+        network = Network(individual)
+    except:
+        return (0.0,)
+
+    predictions = []
+
+    # Evaluate each sample
+    for i in range(len(X_train)):
+        # Create input dict
+        inputs = {f'x{j}': X_train[i, j] for j in range(4)}
+
         try:
-            network = self.compiler.compile(chromosome)
+            for n in network.nodes:
+                n.prev_value = 0.0
+            # Get network output
+            output = network.forward(inputs)
+            output_val = output.item() if torch.is_tensor(output) else float(output)
 
-            predictions = []
-            for i in range(len(self.X_train)):
-                input_data = self.X_train[i]
-                network_output = network(input_data)
+            # Map to class (3 classes: 0, 1, 2)
+            if output_val < -0.33:
+                pred = 0
+            elif output_val < 0.33:
+                pred = 1
+            else:
+                pred = 2
 
-                if network_output.dim() == 0:
-                    network_output = network_output.unsqueeze(0)
+            predictions.append(output_val)
 
-                if len(network_output) < self.num_classes:
-                    padding = torch.zeros(self.num_classes - len(network_output))
-                    network_output = torch.cat([network_output, padding])
-                elif len(network_output) > self.num_classes:
-                    network_output = network_output[:self.num_classes]
+        except:
+            predictions.append(0)  # Default prediction on error
 
-                predictions.append(network_output)
+    # Calculate accuracy
+    accuracy = accuracy_score(y_train, predictions)
 
-            predictions = torch.stack(predictions)
-            predictions = torch.softmax(predictions, dim=1)
+    return (accuracy,)
 
-            error = classification_error(self.y_train, predictions)
-            return error
+'''
+def evaluate_xor(individual):
+    """
+    Evaluate individual on XOR classification task using hybrid fitness.
 
-        except Exception as e:
-            return 1.0
+    Args:
+        individual: GEP individual to evaluate
 
+    Returns:
+        Tuple with hybrid fitness score (combines MSE and accuracy)
+    """
+    # Define the 4 XOR patterns
+    X = np.array([[0, 0], [0, 1], [1, 0], [1, 1]])
+    y = np.array([0, 1, 1, 0])  # XOR outputs
 
-class RegressionFitness:
-    def __init__(self, target_function=None):
-        self.target_function = target_function or self.quadratic_function
-        self.generate_data()
-        self.compiler = NetworkCompiler()
+    n_samples = 4
 
-    def quadratic_function(self, x):
-        return x ** 2
+    # Create network
+    try:
+        network = Network(individual)
+    except:
+        return (0.0,)
 
-    def generate_data(self):
-        X = np.linspace(-2, 2, 100).reshape(-1, 1)
-        y = self.target_function(X.flatten())
+    correct = 0
+    total_squared_error = 0.0
 
-        self.X_train = torch.tensor(X, dtype=torch.float32)
-        self.y_train = torch.tensor(y, dtype=torch.float32)
+    # Evaluate each sample
+    for i in range(n_samples):
+        # Create input dict
+        inputs = {
+            'x0': float(X[i, 0]),
+            'x1': float(X[i, 1])
+        }
 
-    def evaluate(self, chromosome):
         try:
-            network = self.compiler.compile(chromosome)
+            # Get network output
+            output = network.forward(inputs)
+            output_val = output.item() if torch.is_tensor(output) else float(output)
 
-            predictions = []
-            for i in range(len(self.X_train)):
-                input_data = self.X_train[i]
-                network_output = network(input_data)
+            # Clamp output to avoid extreme values
+            output_val = max(0.001, min(0.999, output_val))
 
-                if network_output.dim() > 0:
-                    network_output = network_output.mean()
+            # Calculate squared error
+            squared_error = (y[i] - output_val) ** 2
+            total_squared_error += squared_error
 
-                predictions.append(network_output)
+            # Threshold at 0.5 for binary classification
+            pred = 1 if output_val > 0.5 else 0
 
-            predictions = torch.stack(predictions)
-            error = mean_squared_error(self.y_train, predictions)
-            return error
+            # Check if correct
+            if pred == y[i]:
+                correct += 1
 
-        except Exception as e:
-            return 1000.0
+        except:
+            # On error, add maximum squared error (1.0)
+            total_squared_error += 1.0
+
+    # Calculate components
+    mse = total_squared_error / n_samples
+    accuracy = correct / n_samples
+
+    # Hybrid fitness: weighted combination of MSE and accuracy
+    # Higher weight on MSE (0.7) to provide more granular feedback
+    w_mse = 0.7
+    w_acc = 0.3
+
+    fitness = w_mse * (1 - mse) + w_acc * accuracy
+
+    return (fitness,)
+'''
 
 
-def get_fitness_function(task_type='iris_classification'):
-    if task_type == 'iris_classification':
-        return IrisClassificationFitness()
-    elif task_type == 'regression':
-        return RegressionFitness()
-    else:
-        raise ValueError(f"Unknown task type: {task_type}")
+def evaluate_xor(individual):
+    """
+    Evaluate individual on XOR classification task using hybrid fitness.
+
+    Args:
+        individual: GEP individual to evaluate
+
+    Returns:
+        Tuple with hybrid fitness score (combines MSE and accuracy)
+    """
+    # Define the 4 XOR patterns
+    X = np.array([[0, 0], [0, 1], [1, 0], [1, 1]])
+    y = np.array([0, 1, 1, 0])  # XOR outputs
+
+    # Randomize the order
+    indices = np.random.permutation(4)
+
+    # Create network
+    try:
+        network = Network(individual)
+    except:
+        return (0.0,)
+
+    correct = 0
+    total_squared_error = 0.0
+
+    # Evaluate each sample in random order
+    for i in indices:
+        # Create input dict
+        inputs = {
+            'x0': float(X[i, 0]),
+            'x1': float(X[i, 1])
+        }
+
+        try:
+            for n in network.nodes:
+                n.prev_value = 0.0
+            # Get network output
+            output = network.forward(inputs)
+            output_val = output.item() if torch.is_tensor(output) else float(output)
+
+            # Clamp output to avoid extreme values
+            output_val = max(0.001, min(0.999, output_val))
+
+            # Calculate squared error
+            squared_error = (y[i] - output_val) ** 2
+            total_squared_error += squared_error
+
+            # Threshold at 0.5 for binary classification
+            pred = 1 if output_val > 0.5 else 0
+
+            # Check if correct
+            if pred == y[i]:
+                correct += 1
+
+        except:
+            # On error, add maximum squared error (1.0)
+            total_squared_error += 1.0
+
+    # Calculate components
+    mse = total_squared_error / 4
+    accuracy = correct / 4
+
+    # Hybrid fitness: weighted combination of MSE and accuracy
+    # Higher weight on MSE (0.7) to provide more granular feedback
+    w_mse = 0.7
+    w_acc = 0.3
+
+    fitness = w_mse * (1 - mse) + w_acc * accuracy
+
+    return (fitness,)

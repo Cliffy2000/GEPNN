@@ -1,35 +1,36 @@
+import torch
 import random
 import numpy as np
 from deap import base, creator, tools, algorithms
-from core.individual import Individual
+from core.individual import Individual_xor
 from core.network import Network
-from core.operators import crossover_one_point, mutate
+from core.operators import crossover_one_point, mutate_xor
 from utils.output_utils import print_header, print_section_break, format_list
-from evaluation.fitness import evaluate_iris
+from evaluation.fitness import evaluate_xor
 
 # GA Parameters
-POPULATION_SIZE = 100
-N_GENERATIONS = 50
+POPULATION_SIZE = 400
+N_GENERATIONS = 2500
 CXPB = 0.7  # Crossover probability
-MUTPB = 0.2  # Mutation probability
-TOURNSIZE = 3  # Tournament selection size
+MUTPB = 0.15  # Mutation probability
+TOURNSIZE = 25  # Tournament selection size
 
-# GEP Parameters
-HEAD_LENGTH = 10    # tail ~ 10 * 2 + 1
-NUM_INPUTS = 4
-NUM_WEIGHTS = 30
-NUM_BIASES = 10
+# GEP Parameters for XOR
+HEAD_LENGTH = 10  # Smaller head for simpler XOR problem
+NUM_INPUTS = 2  # XOR has 2 inputs
+NUM_WEIGHTS = 20  # Fewer weights needed
+NUM_BIASES = 10  # Fewer biases needed
 
 # Create DEAP types
 creator.create("FitnessMax", base.Fitness, weights=(1.0,))
-creator.create("GEPIndividual", Individual, fitness=creator.FitnessMax)
+creator.create("GEPIndividual", Individual_xor, fitness=creator.FitnessMax)
 
 # Initialize toolbox
 toolbox = base.Toolbox()
 
 
 def create_individual():
-    """Create a GEP individual with random initialization."""
+    """Create a GEP individual with XOR-specific initialization."""
     ind = creator.GEPIndividual(
         head_length=HEAD_LENGTH,
         num_inputs=NUM_INPUTS,
@@ -72,7 +73,7 @@ def crossover_wrapper(ind1, ind2):
 def mutation_wrapper(ind):
     """Wrapper for mutation that maintains DEAP compatibility."""
     # Perform mutation
-    mutated = mutate(ind)
+    mutated = mutate_xor(ind)
 
     # Create new DEAP individual from mutated
     new_ind = creator.GEPIndividual(
@@ -92,15 +93,49 @@ def mutation_wrapper(ind):
 # Register functions with toolbox
 toolbox.register("individual", create_individual)
 toolbox.register("population", tools.initRepeat, list, toolbox.individual)
-toolbox.register("evaluate", evaluate_iris)
+toolbox.register("evaluate", evaluate_xor)
 toolbox.register("mate", crossover_wrapper)
 toolbox.register("mutate", mutation_wrapper)
 toolbox.register("select", tools.selTournament, tournsize=TOURNSIZE)
 
 
+def test_xor_solution(network):
+    """Test the network on all 4 XOR cases."""
+    print("\nTesting XOR Truth Table:")
+    print("Input | Expected | Actual | Correct")
+    print("-" * 40)
+
+    test_cases = [
+        ([0, 0], 0),
+        ([0, 1], 1),
+        ([1, 0], 1),
+        ([1, 1], 0)
+    ]
+
+    all_correct = True
+
+    for inputs, expected in test_cases:
+        input_dict = {'x0': float(inputs[0]), 'x1': float(inputs[1])}
+
+        try:
+            output = network.forward(input_dict)
+            output_val = output.item() if torch.is_tensor(output) else float(output)
+            predicted = 1 if output_val > 0.5 else 0
+
+            correct = predicted == expected
+            all_correct &= correct
+
+            print(f"{inputs[0]}, {inputs[1]}   |    {expected}     | {output_val:.3f} ({predicted}) | {'✓' if correct else '✗'}")
+        except Exception as e:
+            print(f"{inputs[0]}, {inputs[1]}   |    {expected}     | Error | ✗")
+            all_correct = False
+
+    return all_correct
+
+
 def main():
-    """Main evolutionary algorithm loop."""
-    print_header("GEP EVOLUTIONARY ALGORITHM", level=1)
+    """Main evolutionary algorithm loop for XOR problem."""
+    print_header("GEP EVOLUTIONARY ALGORITHM - XOR PROBLEM", level=1)
     print(f"Population Size: {POPULATION_SIZE}")
     print(f"Generations: {N_GENERATIONS}")
     print(f"Head Length: {HEAD_LENGTH}")
@@ -133,9 +168,17 @@ def main():
     print_section_break()
     print("Starting evolution...")
 
+    # Calculate elitism size (10% of population)
+    elite_size = int(0.1 * POPULATION_SIZE)
+    print(f"Using elitism with {elite_size} elite individuals")
+
     for gen in range(N_GENERATIONS):
-        # Select the next generation
-        offspring = toolbox.select(population, len(population))
+        # Store elite individuals before creating offspring
+        elite = tools.selBest(population, elite_size)
+
+        # Select the next generation (only need to fill non-elite spots)
+        offspring_size = POPULATION_SIZE - elite_size
+        offspring = toolbox.select(population, offspring_size)
         offspring = list(map(toolbox.clone, offspring))
 
         # Apply crossover
@@ -157,8 +200,8 @@ def main():
         for ind, fit in zip(invalid_ind, fitnesses):
             ind.fitness.values = fit
 
-        # Replace population
-        population[:] = offspring
+        # Combine elite and offspring to form new population
+        population[:] = elite + offspring
 
         # Update hall of fame
         hof.update(population)
@@ -170,6 +213,12 @@ def main():
         print(f"  Max: {record['max']:.4f}")
         print(f"  Avg: {record['avg']:.4f}")
         print(f"  Std: {record['std']:.4f}")
+        print(f"  Best ever: {hof[0].fitness.values[0]:.4f}")
+
+        # Check for perfect solution
+        if record['max'] >= 1.0:
+            print("\n*** PERFECT SOLUTION FOUND! ***")
+            break
 
     # Print final results
     print_section_break()
@@ -184,21 +233,24 @@ def main():
     print("\nBest Network Structure:")
     best_network.print_structure()
 
-    # Test the best network
+    # Test the best network on XOR truth table
     print_section_break()
-    print_header("TESTING BEST NETWORK", level=2)
-    test_inputs = {f'x{i}': random.random() for i in range(NUM_INPUTS)}
-    output = best_network.forward(test_inputs)
-    print(f"\nTest Input: {test_inputs}")
-    print(f"Network Output: {output}")
+    print_header("TESTING BEST NETWORK ON XOR", level=2)
+    perfect = test_xor_solution(best_network)
+
+    if perfect:
+        print("\n✓ Network correctly solves XOR problem!")
+    else:
+        print("\n✗ Network does not perfectly solve XOR problem")
 
     return population, hof
 
 
 if __name__ == "__main__":
-    random.seed(None)
+
+
     # Run the GA
     final_population, hall_of_fame = main()
 
     print("\n" + "=" * 80)
-    print("Algorithm execution completed successfully!")
+    print("XOR trial execution completed successfully!")

@@ -44,3 +44,24 @@ def get_functions():
         (sigmoid, 2),
         (sigmoid3, 3),
     ]
+
+
+def not_f(x):
+    return 1 - x
+
+def and_f(x, y):
+    return x & y
+
+def or_f(x, y):
+    return x | y
+
+def get_xor_functions():
+    return [
+        (not_f, 1),
+        (and_f, 2),
+        (or_f, 2),
+        (relu, 2),
+        (tanh, 2),
+        (sigmoid, 2)
+    ]
+
