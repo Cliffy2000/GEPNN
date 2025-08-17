@@ -1,120 +1,136 @@
 import random
 from core.individual import Individual, Individual_xor
-from primitives.functions import get_functions, get_xor_functions
+from primitives.functions import get_functions, get_functions_xor
 from primitives.terminals import get_input_terminals, get_index_terminals
 
 _cache = {}
+_cache_xor = {}
 
-def _get_symbols(head_length, num_inputs):
+def _get_symbol(head_length, num_inputs):
     key = (head_length, num_inputs)
+
     if key not in _cache:
         functions = [f for f, _ in get_functions()]
+        indices = get_index_terminals(head_length)
         inputs = get_input_terminals(num_inputs)
-        indices = get_index_terminals(head_length)     # NOTE: potentially change to head_length + tail_length
-        _cache[key] = (functions, inputs, indices)
+        _cache[key] = (functions, indices, inputs)
+
     return _cache[key]
 
+def _get_symbol_xor(head_length, num_inputs):
+    key = (head_length, num_inputs)
 
-def crossover_one_point(indv1: Individual, indv2: Individual):
+    if key not in _cache_xor:
+        functions = [f for f, _ in get_functions_xor()]
+        indices = get_index_terminals(head_length)
+        inputs = get_input_terminals(num_inputs)
+        _cache_xor[key] = (functions, indices, inputs)
+
+    return _cache_xor[key]
+
+
+def crossover_one_point(indv1, indv2, crossover_rate):
     """
-    Performs crossover between two chromosome individuals
-    :param indv1: first parent
-    :param indv2: second parent
-    :return: Two new offspring
+    Performs one point crossover on two parents at the crossover_rate, nothing changes if the probability is not met.
+    :param indv1: parent 1
+    :param indv2: parent 2
+    :param crossover_rate: the probability that a crossover is performed
+    :return: the genes of offspring1 and offspring2
     """
     gene1 = indv1.gene
     gene2 = indv2.gene
 
-    crossover_point = random.randint(1, len(gene1) - 1)
+    crossover_point = random.randint(1, len(indv1.gene) - 1)
 
-    new_gene1 = gene1[:crossover_point] + gene2[crossover_point:]
-    new_gene2 = gene2[:crossover_point] + gene1[crossover_point:]
+    if random.random() < crossover_rate:
+        new_gene1 = gene1[:crossover_point] + gene2[crossover_point:]
+        new_gene2 = gene2[:crossover_point] + gene1[crossover_point:]
 
-    offspring1 = Individual(
-        head_length = indv1.head_length,
-        num_inputs = indv1.num_inputs,
-        num_weights = indv1.num_weights,
-        num_biases = indv1.num_biases,
-        chromosome = new_gene1
-    )
-    offspring2 = Individual(
-        head_length=indv1.head_length,
-        num_inputs=indv1.num_inputs,
-        num_weights=indv1.num_weights,
-        num_biases=indv1.num_biases,
-        chromosome=new_gene2
-    )
+        return new_gene1, new_gene2
 
-    return offspring1, offspring2
+    return gene1, gene2
 
 
-def mutate(indv: Individual):
+def mutate(indv: Individual, mutation_rate):
     """
-    The mutation operator if mutation takes place, operates on the head / tail / weights & biases separately
-    :param indv: Individual to mutate
-    :return: New individual
+    Perform allele-wise mutation according to the mutation_rate on the gene of the given individual.
+    :param indv: the original individual
+    :param mutation_rate: the probability that a single allele is mutated
+    :return: the mutated gene
     """
-    functions, inputs, indices = _get_symbols(indv.head_length, indv.num_inputs)
-    head_symbols = functions + inputs + indices
-    tail_symbols = inputs       # NOTE: could be changed to inputs + indices
+    # NOTE: Room for optimization with numpy
+    functions, indices, inputs = _get_symbol(indv.head_length, indv.num_inputs)
 
-    new_gene = (
-        [random.choice(head_symbols) for _ in indv.head] +
-        [random.choice(tail_symbols) for _ in indv.tail] +
-        [w + random.gauss(0, 1) for w in indv.weights] +
-        [b + random.gauss(0, 1) for b in indv.biases]
-    )
-
-    return Individual(
-        head_length = indv.head_length,
-        num_inputs = indv.num_inputs,
-        num_weights = indv.num_weights,
-        num_biases = indv.num_biases,
-        chromosome = new_gene
-    )
-
-
-def _get_symbols_xor(head_length, num_inputs):
-    key = (head_length, num_inputs)
-    if key not in _cache:
-        functions = [f for f, _ in get_xor_functions()]
-        inputs = get_input_terminals(num_inputs)
-        indices = get_index_terminals(head_length)     # NOTE: potentially change to head_length + tail_length
-        _cache[key] = (functions, inputs, indices)
-    return _cache[key]
-
-
-def mutate_xor(indv: Individual):
-    """
-    The mutation operator if mutation takes place, operates on the head / tail / weights & biases separately
-    :param indv: Individual to mutate
-    :return: New individual
-    """
-    functions, inputs, indices = _get_symbols_xor(indv.head_length, indv.num_inputs)
-    tail_symbols = inputs       # NOTE: could be changed to inputs + indices
-
-    # Create new head with equal probability for each symbol type
     new_head = []
-    for _ in range(indv.head_length):
-        symbol_type = random.choice(['function', 'input', 'index'])
-        if symbol_type == 'function':
-            new_head.append(random.choice(functions))
-        elif symbol_type == 'input':
-            new_head.append(random.choice(inputs))
-        else:  # index
-            new_head.append(random.choice(indices))
+    for i in range(indv.head_length):
+        if random.random() < mutation_rate:
+            symbol_type = random.choice(['function', 'index', 'input'])
+            if symbol_type == 'function':
+                new_head.append(random.choice(functions))
+            elif symbol_type == 'index':
+                new_head.append(random.choice(indices))
+            else:
+                new_head.append(random.choice(inputs))
+        else:
+            # this allele in the head is not mutated
+            new_head.append(indv.gene[i])
 
-    new_gene = (
-        new_head +
-        [random.choice(tail_symbols) for _ in indv.tail] +
-        [w + random.gauss(0, 1) for w in indv.weights] +
-        [b + random.gauss(0, 1) for b in indv.biases]
-    )
+    new_tail = []
+    for i in range(indv.tail_length):
+        if random.random() < mutation_rate:
+            new_tail.append(random.choice(inputs))
+        else:
+            new_tail.append(indv.gene[indv.head_length + i])
 
-    return Individual_xor(  # Use Individual_xor to maintain weights=1.0, biases=0.0
-        head_length = indv.head_length,
-        num_inputs = indv.num_inputs,
-        num_weights = indv.num_weights,
-        num_biases = indv.num_biases,
-        chromosome = new_gene
-    )
+    new_coeff = []
+    for i in range(indv.num_weights + indv.num_biases):
+        if random.random() < mutation_rate:
+            new_coeff.append(indv.gene[indv.head_length + indv.tail_length + i] + random.gauss(0, 1))
+        else:
+            new_coeff.append(indv.gene[indv.head_length + indv.tail_length + i])
+
+    new_gene = new_head + new_tail + new_coeff
+    return new_gene
+
+
+def mutate_xor(indv: Individual_xor, mutation_rate):
+    """
+    Perform allele-wise mutation according to the mutation_rate on the gene of the given individual.
+    :param indv: the original individual
+    :param mutation_rate: the probability that a single allele is mutated
+    :return: the mutated gene
+    """
+    # NOTE: Room for optimization with numpy
+    functions, indices, inputs = _get_symbol_xor(indv.head_length, indv.num_inputs)
+
+    new_head = []
+    for i in range(indv.head_length):
+        if random.random() < mutation_rate:
+            symbol_type = random.choice(['function', 'index', 'input'])
+            if symbol_type == 'function':
+                new_head.append(random.choice(functions))
+            elif symbol_type == 'index':
+                new_head.append(random.choice(indices))
+            else:
+                new_head.append(random.choice(inputs))
+        else:
+            # this allele in the head is not mutated
+            new_head.append(indv.gene[i])
+
+    new_tail = []
+    for i in range(indv.tail_length):
+        if random.random() < mutation_rate:
+            new_tail.append(random.choice(inputs))
+        else:
+            new_tail.append(indv.gene[indv.head_length + i])
+
+    new_coeff = []
+    for i in range(indv.num_weights + indv.num_biases):
+        if random.random() < mutation_rate:
+            new_coeff.append(indv.gene[indv.head_length + indv.tail_length + i] + random.gauss(0, 1))
+        else:
+            new_coeff.append(indv.gene[indv.head_length + indv.tail_length + i])
+
+    new_gene = new_head + new_tail + new_coeff
+    return new_gene
+

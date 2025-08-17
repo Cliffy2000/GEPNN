@@ -55,7 +55,7 @@ def and_f(x, y):
 def or_f(x, y):
     return x | y
 
-def get_xor_functions():
+def get_functions_xor():
     return [
         (not_f, 1),
         (and_f, 2),
