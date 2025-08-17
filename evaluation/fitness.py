@@ -38,15 +38,6 @@ def get_iris_data():
 
 
 def evaluate_iris(individual):
-    """
-    Evaluate individual on Iris classification task.
-
-    Args:
-        individual: GEP individual to evaluate
-
-    Returns:
-        Tuple with accuracy score
-    """
     data = get_iris_data()
     X_train = data['X_train']
     y_train = data['y_train']
@@ -229,6 +220,6 @@ def evaluate_xor(individual):
     w_mse = 0.7
     w_acc = 0.3
 
-    fitness = w_mse * (1 - mse) + w_acc * accuracy
+    fitness = (w_mse * (1 - mse) + w_acc * accuracy) * 100
 
     return (fitness,)

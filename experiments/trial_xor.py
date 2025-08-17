@@ -18,7 +18,7 @@ TOURNSIZE = 25  # Tournament selection size
 # GEP Parameters for XOR
 HEAD_LENGTH = 10  # Smaller head for simpler XOR problem
 NUM_INPUTS = 2  # XOR has 2 inputs
-NUM_WEIGHTS = 20  # Fewer weights needed
+NUM_WEIGHTS = 21  # Fewer weights needed
 NUM_BIASES = 10  # Fewer biases needed
 
 # Create DEAP types
@@ -189,6 +189,7 @@ def main():
                 offspring[offspring.index(child2)] = child2_new
 
         # Apply mutation
+        # TODO: fix mutate
         for mutant in offspring:
             if random.random() < MUTPB:
                 mutated = toolbox.mutate(mutant)
@@ -215,10 +216,12 @@ def main():
         print(f"  Std: {record['std']:.4f}")
         print(f"  Best ever: {hof[0].fitness.values[0]:.4f}")
 
+        '''
         # Check for perfect solution
         if record['max'] >= 1.0:
             print("\n*** PERFECT SOLUTION FOUND! ***")
             break
+        '''
 
     # Print final results
     print_section_break()
