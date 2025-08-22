@@ -495,7 +495,3 @@ class Network:
                     desc += f" -> invalid[{target_idx}]"
 
             print(desc)
-
-        # Summary stats
-        active_weights, active_biases = self.get_active_parameters()
-        print(f"\nActive parameters: {active_weights} weights, {active_biases} biases")

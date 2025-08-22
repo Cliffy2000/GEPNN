@@ -220,6 +220,6 @@ def evaluate_xor(individual):
     w_mse = 0.7
     w_acc = 0.3
 
-    fitness = (w_mse * (1 - mse) + w_acc * accuracy) * 100
+    fitness = (w_mse * (1 - mse) + w_acc * accuracy)
 
     return (fitness,)

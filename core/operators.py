@@ -106,11 +106,9 @@ def mutate_xor(indv: Individual_xor, mutation_rate):
     new_head = []
     for i in range(indv.head_length):
         if random.random() < mutation_rate:
-            symbol_type = random.choice(['function', 'index', 'input'])
+            symbol_type = random.choice(['function', 'input'])
             if symbol_type == 'function':
                 new_head.append(random.choice(functions))
-            elif symbol_type == 'index':
-                new_head.append(random.choice(indices))
             else:
                 new_head.append(random.choice(inputs))
         else:

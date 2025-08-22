@@ -1,5 +1,5 @@
 import random
-from primitives.functions import get_functions, get_xor_functions
+from primitives.functions import get_functions, get_functions_xor
 from primitives.terminals import get_input_terminals, get_index_terminals, get_random_weight, get_random_bias
 
 
@@ -84,14 +84,19 @@ class Individual:
 class Individual_xor(Individual):
     def _create_random(self):
         """Create a random individual."""
-        functions = [f for f, _ in get_xor_functions()]
+        functions = [f for f, _ in get_functions_xor()]
         inputs = get_input_terminals(self.num_inputs)
         indices = get_index_terminals(self.head_length)
 
-        # TODO: confirm initial probabilities
-        pool = functions + inputs + indices
+        new_head = []
+        for i in range(self.head_length):
+            symbol_type = random.choice(['function', 'input'])
+            if symbol_type == 'function':
+                new_head.append(random.choice(functions))
+            else:
+                new_head.append(random.choice(inputs))
+        self.head = new_head
 
-        self.head = [random.choice(pool) for _ in range(self.head_length)]
         self.tail = [random.choice(inputs) for _ in range(self.tail_length)]
         self.weights = [get_random_weight() for _ in range(self.num_weights)]
         self.biases = [get_random_bias() for _ in range(self.num_biases)]

@@ -33,6 +33,9 @@ def sigmoid3(x, y, z):
 
 def get_functions():
     return [
+        (not_f, 1),
+        (and_f, 2),
+        (or_f, 2),
         (add, 2),
         (add3, 3),
         (subtract, 2),
@@ -50,10 +53,10 @@ def not_f(x):
     return 1 - x
 
 def and_f(x, y):
-    return x & y
+    return torch.logical_and(x > 0.5, y > 0.5).float()
 
 def or_f(x, y):
-    return x | y
+    return torch.logical_or(x > 0.5, y > 0.5).float()
 
 def get_functions_xor():
     return [
