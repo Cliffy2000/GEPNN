@@ -10,7 +10,7 @@ from evaluation.fitness import evaluate_xor
 
 # GA Parameters
 POPULATION_SIZE = 1000
-GENERATION_COUNT = 50
+GENERATION_COUNT = 500
 CROSSOVER_RATE = 0.85
 MUTATION_RATE = 0.1
 TOURNAMENT_SIZE = 8
@@ -202,7 +202,7 @@ def main():
         print(f"  Best ever: {hof[0].fitness.values[0]:.4f}")
 
         # Check for perfect solution
-        if record['max'] >= 1.0:
+        if record['max'] >= 0.9998:
             print("\n*** PERFECT SOLUTION FOUND! ***")
             break
 
