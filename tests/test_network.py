@@ -127,7 +127,102 @@ class TestNetwork(unittest.TestCase):
         expected = 36.0
         self.assertAlmostEqual(expected, result.item())
 
-'''
+    def test_specific_individual_fitness(self):
+        """Test fitness evaluation of specific individual."""
+        from primitives.functions import tanh, multiply, add
+        from evaluation.fitness import evaluate_xor
+
+        # The specific individual
+        chromosome = [
+            tanh, multiply, InputTerminal(0), InputTerminal(1), add,
+            InputTerminal(0), InputTerminal(1), InputTerminal(0),
+            # Tail (17 elements)
+            InputTerminal(0), InputTerminal(0), InputTerminal(1), InputTerminal(0),
+            InputTerminal(1), InputTerminal(1), InputTerminal(0), InputTerminal(0),
+            InputTerminal(0), InputTerminal(0), InputTerminal(1), InputTerminal(1),
+            InputTerminal(1), InputTerminal(0), InputTerminal(0), InputTerminal(1),
+            InputTerminal(0),
+            # Weights (16)
+            1.7241547182625894, 3.1723251237480206, -1.4478290641511684, 2.480997583448104,
+            1.8508306741714478, 0.8913540244102478, 1.8751992324743543, 1.5752192605535866,
+            -1.7370924949645996, -1.9757283471387248, 1.1963967084884644, -2.0744085266786882,
+            3.3392197123736778, -2.325628891045713, 3.108464744943104, -0.2191777527332306,
+            # Biases (8)
+            0.5632854667504225, -0.9878491220275905, -1.974275116172632, 1.3006843328475952,
+            0.4542977809906006, -0.5106743574142456, -0.7389845431666773, 2.1065809249854186
+        ]
+
+        ind = Individual(head_length=8, num_inputs=2, num_weights=16,
+                         num_biases=8, chromosome=chromosome)
+
+        # Get fitness
+        fitness = evaluate_xor(ind)
+        print(f"\nFitness score: {fitness[0]}")
+
+        # Also manually check each XOR case
+        network = Network(ind)
+        print("\nDetailed XOR evaluation:")
+        xor_cases = [(0, 0, 0), (0, 1, 1), (1, 0, 1), (1, 1, 0)]
+
+        for x0, x1, target in xor_cases:
+            for node in network.nodes:
+                node.prev_value = 0.0
+            result = network.forward({'x0': float(x0), 'x1': float(x1)})
+            result_val = result.item()
+            pred = 1 if result_val > 0.5 else 0
+            print(f"({x0}, {x1}) -> {result_val:.4f} -> {pred} (target: {target})")
+
+
+    def test_specific_tanh_multiply_case(self):
+        """Test specific individual with tanh at root."""
+        from primitives.functions import tanh, multiply, add
+
+        # Parse the individual
+        chromosome = [
+            tanh, multiply, InputTerminal(0), InputTerminal(1), add,
+            InputTerminal(0), InputTerminal(1), InputTerminal(0),
+            # Tail (17 elements)
+            InputTerminal(0), InputTerminal(0), InputTerminal(1), InputTerminal(0),
+            InputTerminal(1), InputTerminal(1), InputTerminal(0), InputTerminal(0),
+            InputTerminal(0), InputTerminal(0), InputTerminal(1), InputTerminal(1),
+            InputTerminal(1), InputTerminal(0), InputTerminal(0), InputTerminal(1),
+            InputTerminal(0),
+            # Weights (16)
+            1.7241547182625894, 3.1723251237480206, -1.4478290641511684, 2.480997583448104,
+            1.8508306741714478, 0.8913540244102478, 1.8751992324743543, 1.5752192605535866,
+            -1.7370924949645996, -1.9757283471387248, 1.1963967084884644, -2.0744085266786882,
+            3.3392197123736778, -2.325628891045713, 3.108464744943104, -0.2191777527332306,
+            # Biases (8)
+            0.5632854667504225, -0.9878491220275905, -1.974275116172632, 1.3006843328475952,
+            0.4542977809906006, -0.5106743574142456, -0.7389845431666773, 2.1065809249854186
+        ]
+
+        ind = Individual(head_length=8, num_inputs=2, num_weights=16,
+                         num_biases=8, chromosome=chromosome)
+        network = Network(ind)
+
+        # Print structure to debug
+        print("\n\nSpecific tanh case - Tree structure:")
+        network.print_tree()
+
+        # Manual calculation for x0=1.0, x1=0.0
+        # multiply: (1.0*-1.4478) + (0.0*2.4810) + (-0.9878) = -2.4356
+        # add: (1.0*1.8508) + (0.0*0.8913) + (-1.9743) = -0.1235
+        # tanh: tanh((-2.4356*1.7242) + (-0.1235*3.1723)) + 0.5633
+        #     = tanh(-4.5907) + 0.5633 = -0.9999 + 0.5633 = -0.4366
+
+        result = network.forward({'x0': 1.0, 'x1': 0.0})
+
+        # Let's verify step by step
+        import torch
+        mult_result = (1.0 * -1.4478290641511684) + (0.0 * 2.480997583448104) + (-0.9878491220275905)
+        add_result = (1.0 * 1.8508306741714478) + (0.0 * 0.8913540244102478) + (-1.974275116172632)
+        tanh_input = (mult_result * 1.7241547182625894) + (add_result * 3.1723251237480206)
+        expected = torch.tanh(torch.tensor(tanh_input)).item() + 0.5632854667504225
+
+        print(f"Result: {result.item():.6f}, Expected: {expected:.6f}")
+        self.assertAlmostEqual(expected, result.item(), places=4)
+    '''
 
 
     def test_forward_reference(self):
