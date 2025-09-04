@@ -17,14 +17,14 @@ import sys
 # ==================================================
 
 # Experiment Parameters
-ITERATIONS = 100
-CORES = 12
+ITERATIONS = 10
+CORES = 100
 
 # GA Parameters
 POPULATION_SIZE = 250
-MAX_GENERATION_LIMIT = 5000
-CROSSOVER_RATE = 0.75
-MUTATION_RATE = 0.2
+MAX_GENERATION_LIMIT = 2000
+CROSSOVER_RATE = 0.85
+MUTATION_RATE = 0.15
 TOURNAMENT_SIZE = 2
 ELITISM_RATIO = 0.02
 
@@ -44,6 +44,10 @@ def signal_handler(sig, frame):
     global interrupted
     interrupted = True
     print("\n\nInterrupt received! Stopping gracefully...")
+
+def init_worker():
+    """Initialize worker process to ignore SIGINT"""
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
 
 # Register the signal handler
 signal.signal(signal.SIGINT, signal_handler)
@@ -218,27 +222,27 @@ if __name__ == "__main__":
     creator.create("GEPIndividual", Individual_xor, fitness=creator.FitnessMax)
 
     toolbox = base.Toolbox()
-    pool = Pool()
-    toolbox.register("map", pool.map)
+    toolbox.register("map", map)
     toolbox.register("individual", create_individual_wrapper)
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
     toolbox.register("evaluate", evaluate_xor)
-    toolbox.register("select", tools.selTournament, tournsize=TOURNAMENT_SIZE)
+    toolbox.register("select", tools.selRoulette)
     toolbox.register("crossover", crossover_wrapper)
     toolbox.register("mutate", mutation_wrapper)
 
     results = []
 
     try:
-        for i in range(ITERATIONS):
-            if interrupted:
-                print("\nStopping iterations...")
-                break
-            result = run_ga_iteration(i + 1)
-            results.append(result)
-            print()  # Empty line between iterations
+        with Pool(processes=CORES, initializer=init_worker) as pool:
+            # Create list of iteration numbers
+            iteration_numbers = list(range(1, ITERATIONS + 1))
+            
+            # Run all iterations in parallel
+            results = pool.map(run_ga_iteration, iteration_numbers)
+            
     except KeyboardInterrupt:
         print("\nKeyboard interrupt detected!")
+        results = []
     finally:
         print("=" * 60)
         perfect_count = sum(1 for r in results if r['perfect_found'])
@@ -298,9 +302,6 @@ if __name__ == "__main__":
                 },
                 'results': json_results
             }, f, indent=4)
-
-        pool.close()
-        pool.join()
 
 
 

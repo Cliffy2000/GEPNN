@@ -1,6 +1,7 @@
 import torch
 import torch.nn.functional as F
 
+# Linear aggregation functions
 def add(x, y):
     return x + y
 
@@ -13,6 +14,17 @@ def subtract(x, y):
 def multiply(x, y):
     return x * y
 
+# Unary activation functions (NEW)
+def sigmoid1(x):
+    return torch.sigmoid(x)
+
+def tanh1(x):
+    return torch.tanh(x)
+
+def relu1(x):
+    return F.relu(x)
+
+# Binary activation functions (combining aggregation + activation)
 def relu(x, y):
     return F.relu(x + y)
 
@@ -31,40 +43,64 @@ def sigmoid(x, y):
 def sigmoid3(x, y, z):
     return torch.sigmoid(x + y + z)
 
-def get_functions():
-    return [
-        (not_f, 1),
-        (and_f, 2),
-        (or_f, 2),
-        (add, 2),
-        (add3, 3),
-        (subtract, 2),
-        (multiply, 2),
-        (relu, 2),
-        (relu3, 3),
-        (tanh, 2),
-        (tanh3, 3),
-        (sigmoid, 2),
-        (sigmoid3, 3),
-    ]
-
-
+# Logic-based functions
 def not_f(x):
     return 1 - x
 
+# UPDATED: Smooth versions of logical functions
 def and_f(x, y):
-    return torch.logical_and(x > 0.5, y > 0.5).float()
+    # Soft AND using sigmoid approximation
+    # High output when both inputs are high
+    return torch.sigmoid(10 * (x + y - 1.5))
 
 def or_f(x, y):
-    return torch.logical_or(x > 0.5, y > 0.5).float()
+    # Soft OR using sigmoid approximation
+    # High output when at least one input is high
+    return torch.sigmoid(10 * (x + y - 0.5))
 
-def get_functions_xor():
+
+def get_functions():
+    """Returns all available functions for general use"""
     return [
+        # Unary functions
         (not_f, 1),
+        (sigmoid1, 1),
+        (tanh1, 1),
+        (relu1, 1),
+        
+        # Binary functions
         (and_f, 2),
         (or_f, 2),
+        (add, 2),
+        (subtract, 2),
+        (multiply, 2),
         (relu, 2),
         (tanh, 2),
-        (sigmoid, 2)
+        (sigmoid, 2),
+        
+        # Ternary functions
+        (add3, 3),
+        (relu3, 3),
+        (tanh3, 3),
+        (sigmoid3, 3),
     ]
 
+def get_functions_xor():
+    """Returns optimized function set for XOR problem"""
+    return [
+        # Unary activations
+        (sigmoid1, 1),
+        (tanh1, 1),
+        (not_f, 1),
+        
+        # Binary operations
+        (add, 2),
+        (subtract, 2),
+        (multiply, 2),
+        (and_f, 2),
+        (or_f, 2),
+        
+        # Binary activations (kept for compatibility)
+        (sigmoid, 2),
+        (tanh, 2),
+    ]
