@@ -17,7 +17,7 @@ import sys
 # ==================================================
 
 # Experiment Parameters
-ITERATIONS = 10
+ITERATIONS = 100
 CORES = 100
 
 # GA Parameters
