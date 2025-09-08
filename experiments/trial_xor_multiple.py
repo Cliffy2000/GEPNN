@@ -1,3 +1,8 @@
+import sys
+import os
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import json
 import pickle
 import datetime
@@ -11,28 +16,27 @@ from evaluation.fitness import evaluate_xor
 from utils.output_utils import print_header, print_section_break
 
 import signal
-import sys
 
 
 # ==================================================
 
 # Experiment Parameters
 ITERATIONS = 100
-CORES = 100
+CORES = 20
 
 # GA Parameters
 POPULATION_SIZE = 250
-MAX_GENERATION_LIMIT = 2000
+MAX_GENERATION_LIMIT = 1000
 CROSSOVER_RATE = 0.85
 MUTATION_RATE = 0.15
 TOURNAMENT_SIZE = 2
 ELITISM_RATIO = 0.02
 
 # GEP Parameters
-HEAD_LENGTH = 8    # tail length = 8 * (2 - 1) + 1 = 9
+HEAD_LENGTH = 6    # tail length = 8 * (2 - 1) + 1 = 9
 NUM_INPUTS = 2
-NUM_WEIGHTS = 16    # all nodes apart from the root node need a weight
-NUM_BIASES = 8     # all head nodes need a bias
+NUM_WEIGHTS = 12    # all nodes apart from the root node need a weight
+NUM_BIASES = 6     # all head nodes need a bias
 
 # ==================================================
 
@@ -116,6 +120,20 @@ def mutation_wrapper(indv):
 
     new_indv.fitness = creator.FitnessMax()
     return (new_indv, )     # must return a tuple that contains the individual
+
+
+creator.create("FitnessMax", base.Fitness, weights=(1.0, ))
+creator.create("GEPIndividual", Individual_xor, fitness=creator.FitnessMax)
+
+toolbox = base.Toolbox()
+toolbox.register("map", map)
+toolbox.register("individual", create_individual_wrapper)
+toolbox.register("population", tools.initRepeat, list, toolbox.individual)
+toolbox.register("evaluate", evaluate_xor)
+toolbox.register("select", tools.selRoulette)
+toolbox.register("crossover", crossover_wrapper)
+toolbox.register("mutate", mutation_wrapper)
+
 
 
 def run_ga_iteration(iteration_num):
@@ -218,18 +236,6 @@ if __name__ == "__main__":
     print(f"Population: {POPULATION_SIZE}, Cores: {CORES}")
     print("=" * 60)
 
-    creator.create("FitnessMax", base.Fitness, weights=(1.0, ))
-    creator.create("GEPIndividual", Individual_xor, fitness=creator.FitnessMax)
-
-    toolbox = base.Toolbox()
-    toolbox.register("map", map)
-    toolbox.register("individual", create_individual_wrapper)
-    toolbox.register("population", tools.initRepeat, list, toolbox.individual)
-    toolbox.register("evaluate", evaluate_xor)
-    toolbox.register("select", tools.selRoulette)
-    toolbox.register("crossover", crossover_wrapper)
-    toolbox.register("mutate", mutation_wrapper)
-
     results = []
 
     try:
@@ -270,8 +276,12 @@ if __name__ == "__main__":
             }, f)
         '''
 
+        # Calculate accuracy (percentage of perfect solutions)
+        perfect_count = sum(1 for r in results if r['perfect_found'])
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"xor_multiple_results_{timestamp}.json"
+        filename = f"xor_h{HEAD_LENGTH}_s{perfect_count}_n{ITERATIONS}_c{CROSSOVER_RATE}_m{MUTATION_RATE}_{timestamp}.json"
+
+        filepath = os.path.join(os.path.dirname(__file__), filename)
 
         # Convert results to JSON-serializable format
         json_results = []
@@ -283,12 +293,12 @@ if __name__ == "__main__":
                 'perfect_found': r['perfect_found'],
                 'final_avg_fitness': r['final_avg_fitness'],
                 'best_individual': {
-                    'expression': str(r['best_individual']),
+                    'expression': r['best_individual'].export(),
                     'fitness': r['best_individual'].fitness.values[0]
                 }
             })
 
-        with open(filename, 'w') as f:
+        with open(filepath, 'w') as f:
             json.dump({
                 'parameters': {
                     'iterations': ITERATIONS,
@@ -301,7 +311,7 @@ if __name__ == "__main__":
                     'head_length': HEAD_LENGTH
                 },
                 'results': json_results
-            }, f, indent=4)
+            }, f, indent=2)
 
-
+        print(f"Results saved to: {filepath}")
 

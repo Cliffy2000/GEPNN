@@ -67,6 +67,25 @@ class Individual:
         tail_names = [name(s) for s in self.tail]
         return f"Individual[Head:{head_names}|Tail:{tail_names}|Weights:{self.weights}|Biases:{self.biases}]"
 
+    def export(self):
+        def name(sym):
+            if hasattr(sym, 'name'):
+                return sym.name
+            if hasattr(sym, '__name__'):
+                return sym.__name__
+            return str(sym)
+        head_names = [name(s) for s in self.head]
+        tail_names = [name(s) for s in self.tail]
+        return {
+            "Individual": {
+                "Head": str(head_names),
+                "Tail": str(tail_names),
+                "Weights": str(self.weights),
+                "Biases": str(self.biases)
+            }
+        }
+
+
     def copy(self):
         """Create a deep copy of this individual, preserving fitness."""
         new_individual = Individual(
