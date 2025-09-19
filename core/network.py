@@ -522,7 +522,6 @@ class Network:
         self.n = len(self.expression)    # length of expression
 
         self.expression = individual.expression
-        self.prev_values = None
         # Pretend 1.0 weight, this would align node index and the index of the used weight
         # The 1.0 is not used, and would not take effect even if it did
         self.weights = np.array([1.0] + list(individual.weights), dtype=np.float32)
@@ -547,6 +546,7 @@ class Network:
             elif isinstance(sym, IndexTerminal):
                 self.is_index[i] = True
 
+        self.prev_values = None
         self._build_tree()
 
     def _build_tree(self):
@@ -597,11 +597,11 @@ class Network:
                     self.values[idx] = self.prev_values[target]
                 elif target < idx:  # skip connection
                     self.values[idx] = self.values[target]
-                # TODO: self loop
+                else:   # self loop
+                    self.values[idx] = self.prev_values[target]
 
             elif self.is_function[idx]:
                 if self.children[idx]:
-                    # TODO: incorrect
                     child_vals = [self.values[c] * w for c,w in zip(self.children[idx], self.child_weights[idx])]
                     self.values[idx] = self.expression[idx](child_vals) + self.biases[idx]
                 else:
@@ -612,17 +612,6 @@ class Network:
         self.prev_values = self.values.copy()
 
         return self.values[0]   # return root value
-
-
-
-
-
-
-
-
-
-
-
 
 
 
