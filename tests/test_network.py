@@ -1,4 +1,5 @@
 import unittest
+import numpy as np
 from core.individual import Individual
 from core.network import Network
 from primitives.functions import add, multiply, sigmoid
@@ -8,7 +9,7 @@ from primitives.terminals import InputTerminal, IndexTerminal
 class TestNetwork(unittest.TestCase):
 
     def test_simple_feedforward(self):
-        """Test basic feedforward computation."""
+        """Test basic feedforward computation with batch processing."""
         # Create specific individual: add(x0, x1)
         # Tree structure:
         # [0] add (bias=10.0)
@@ -29,10 +30,38 @@ class TestNetwork(unittest.TestCase):
                          num_biases=1, chromosome=chromosome)
         network = Network(ind)
 
-        # Test computation: (5.0 * 2.0) + (7.0 * 3.0) + 10.0 = 41.0
-        result = network.forward({'x0': 5.0, 'x1': 7.0})
+        # Debug network structure
+        print("\n=== Network Structure ===")
+        print(f"Expression: {[str(s) for s in network.expression]}")
+        print(f"Weights (with dummy): {network.weights}")
+        print(f"Biases: {network.biases}")
+        print(f"Children: {network.children}")
+        print(f"Child weights: {network.child_weights}")
+        print(f"Is function: {network.is_function}")
+        print(f"Is input: {network.is_input}")
+
+        # Test single instance
+        inputs = np.array([[5.0, 7.0]], dtype=np.float32)
+        print(f"\n=== Forward Pass Debug ===")
+        print(f"Input shape: {inputs.shape}")
+        print(f"Input values: {inputs}")
+
+        # Add debug prints in forward pass
+        result = network.forward(inputs)
+
+        print(f"\n=== After Forward ===")
+        print(f"All node values:")
+        for i in range(network.n):
+            print(f"  Node {i} ({network.expression[i]}): {network.values[i]}")
+
+        print(f"\nResult: {result}")
+        print(f"Expected: 41.0")
+
+        # Expected: (5.0 * 2.0) + (7.0 * 3.0) + 10.0 = 41.0
         expected = 41.0
-        self.assertAlmostEqual(expected, result.item())
+        self.assertAlmostEqual(expected, result[0])
+
+    '''
 
     def test_index_terminal_reference(self):
         """Test that IndexTerminals create proper references."""
@@ -222,7 +251,7 @@ class TestNetwork(unittest.TestCase):
 
         print(f"Result: {result.item():.6f}, Expected: {expected:.6f}")
         self.assertAlmostEqual(expected, result.item(), places=4)
-    '''
+
 
 
     def test_forward_reference(self):

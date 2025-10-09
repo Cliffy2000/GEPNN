@@ -1,4 +1,4 @@
-import torch
+import numpy as np
 
 
 class InputTerminal:
@@ -34,8 +34,8 @@ def get_index_terminals(head_length):
 
 
 def get_random_weight():
-    return torch.randn(1).item()
+    return np.random.randn()
 
 
 def get_random_bias():
-    return torch.randn(1).item()
+    return np.random.randn()

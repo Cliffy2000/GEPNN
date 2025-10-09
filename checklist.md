@@ -1,8 +1,8 @@
 # GEPNN Notepad
 
 ### `Pytorch` &rarr; `Numpy` update
-- functions
-- terminals
+- functions ✓
+- terminals ✓
 - network
   - conversion to numpy ✓
   - cache function mapping ✓
