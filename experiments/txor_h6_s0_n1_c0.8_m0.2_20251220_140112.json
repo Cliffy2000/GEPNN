@@ -1,0 +1,32 @@
+{
+  "parameters": {
+    "iterations": 1,
+    "population_size": 250,
+    "max_generations": 1000,
+    "crossover_rate": 0.8,
+    "mutation_rate": 0.2,
+    "tournament_size": 2,
+    "elitism_ratio": 0.04,
+    "head_length": 6
+  },
+  "results": [
+    {
+      "iteration": 1,
+      "generations": 1000,
+      "best_fitness": 0.7549230769230769,
+      "perfect_found": false,
+      "final_avg_fitness": 0.6655846153846154,
+      "best_individual": {
+        "expression": {
+          "Individual": {
+            "Head": "['subtract', '@0', '@4', 'x0', '@3', '@4']",
+            "Tail": "['x0', 'x0', 'x0', 'x0', 'x0', 'x0', 'x0', 'x0', 'x0', 'x0', 'x0', 'x0', 'x0']",
+            "Weights": "[-0.25322462420015684, 5.222592507516282, -0.4157309588394664, 2.094310237672275, -0.817216675767011, -0.2165010789944687]",
+            "Biases": "[0.20148498350206023, 2.498115784531221, -0.49743154420498525, 2.7752116928472175, -5.126692025585285, -0.9754782911626851]"
+          }
+        },
+        "fitness": 0.7549230769230769
+      }
+    }
+  ]
+}

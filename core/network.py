@@ -136,10 +136,6 @@ class Network:
     '''
 
     def forward(self, inputs_batch):
-        """
-        Data of every instance in batch at single timestep
-        :param inputs_batch: shape (batch_size, num_inputs)
-        """
         batch_size = inputs_batch.shape[0]
 
         if self.prev_values is None:
@@ -154,15 +150,14 @@ class Network:
                 self.values[i] = inputs_batch[:, input_idx]
             elif self.is_index[i]:
                 target = self.expression[i].index
-                if target > i:  # Recurrent
+                if target < i:  # Recurrent (tail -> head from previous timestep)
                     self.values[i] = self.prev_values[target]
-                elif target < i:  # Skip - will handle in second pass
-                    pass
+                elif target > i:  # Skip (head -> later head, evaluated this timestep)
+                    pass  # Handle in second pass
                 else:  # Self-loop
                     self.values[i] = self.prev_values[i]
 
-        # Second pass: Process functions from leaves to root (reverse order)
-        # and resolve skip connections
+        # Second pass: Process functions (reverse order) and skip connections
         for i in range(self.n - 1, -1, -1):
             if self.is_function[i]:
                 if self.children[i]:
@@ -173,8 +168,9 @@ class Network:
                     self.values[i] = self.biases[i]
             elif self.is_index[i]:
                 target = self.expression[i].index
-                if target < i:  # Skip connection
+                if target > i:  # Skip connection only
                     self.values[i] = self.values[target]
+                # Don't touch target < i (already set as recurrent)
 
         self.prev_values = self.values.copy()
         return self.values[0]

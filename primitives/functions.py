@@ -1,76 +1,63 @@
 import numpy as np
 
+CLIP_MIN = -1e6
+CLIP_MAX = 1e6
 
-# Linear aggregation functions
-def add(x, y):
-    return x + y
+# Unary functions
+def not_f(x):
+    return 1 - x
 
+import warnings
 
-def add3(x, y, z):
-    return x + y + z
-
-
-def subtract(x, y):
-    return x - y
-
-
-def multiply(x, y):
-    return x * y
-
-
-# Unary activation functions
 def sigmoid1(x):
-    x = np.clip(x, -50, 50)
+    x = np.clip(x, -80, 80)
     return 1 / (1 + np.exp(-x))
 
-
 def tanh1(x):
-    return np.tanh(x)
-
+    return np.tanh(x)  # Already handles large inputs
 
 def relu1(x):
-    return np.maximum(0, x)
+    return np.clip(np.maximum(0, x), 0, CLIP_MAX)
 
+# Binary functions
+def and_f(x, y):
+    return np.clip(x * y, CLIP_MIN, CLIP_MAX)
 
-# Binary activation functions (combining aggregation + activation)
+def or_f(x, y):
+    return np.clip(x + y - x * y, CLIP_MIN, CLIP_MAX)
+
+def add(x, y):
+    return np.clip(x + y, CLIP_MIN, CLIP_MAX)
+
+def subtract(x, y):
+    return np.clip(x - y, CLIP_MIN, CLIP_MAX)
+
+def multiply(x, y):
+    return np.clip(x * y, CLIP_MIN, CLIP_MAX)
+
 def relu(x, y):
-    return np.maximum(0, x + y)
-
-
-def relu3(x, y, z):
-    return np.maximum(0, x + y + z)
-
+    return np.clip(np.maximum(0, x + y), 0, CLIP_MAX)
 
 def tanh(x, y):
     return np.tanh(x + y)
 
+def sigmoid(x, y):
+    z = np.clip(x + y, -80, 80)
+    return 1 / (1 + np.exp(-z))
+
+# Ternary functions
+def add3(x, y, z):
+    return np.clip(x + y + z, CLIP_MIN, CLIP_MAX)
+
+def relu3(x, y, z):
+    return np.clip(np.maximum(0, x + y + z), 0, CLIP_MAX)
 
 def tanh3(x, y, z):
     return np.tanh(x + y + z)
 
-
-def sigmoid(x, y):
-    sum_val = np.clip(x + y, -50, 50)
-    return 1 / (1 + np.exp(-sum_val))
-
 def sigmoid3(x, y, z):
-    sum_val = np.clip(x + y + z, -50, 50)
-    return 1 / (1 + np.exp(-sum_val))
-
-
-# Logic-based functions
-def not_f(x):
-    return 1 - x
-
-
-# Smooth versions of logical functions
-def and_f(x, y):
-    val = np.clip(10 * (x + y - 1.5), -50, 50)
-    return 1 / (1 + np.exp(-val))
-
-def or_f(x, y):
-    val = np.clip(10 * (x + y - 0.5), -50, 50)
-    return 1 / (1 + np.exp(-val))
+    s = np.clip(x + y + z, -80, 80)
+    return 1 / (1 + np.exp(-s))
 
 
 def get_functions():

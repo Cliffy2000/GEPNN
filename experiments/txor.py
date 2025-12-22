@@ -1,15 +1,9 @@
-# individual - check
-# operators (mutate) - check
-# functions - check
-# fitness - check
-
 import sys
 import os
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import json
-import pickle
 import datetime
 import numpy as np
 from multiprocessing import Pool
@@ -18,23 +12,22 @@ from core.individual import Individual
 from core.network import Network
 from core.operators import crossover_one_point, mutate
 from evaluation.fitness import evaluate_txor
-from utils.output_utils import print_header, print_section_break
 
 import signal
 
 # ==================================================
 
 # Experiment Parameters
-ITERATIONS = 1
-CORES = 1
+ITERATIONS = 25
+CORES = 12
 
 # GA Parameters
 POPULATION_SIZE = 250
-MAX_GENERATION_LIMIT = 1000
-CROSSOVER_RATE = 0.85
-MUTATION_RATE = 0.15
+MAX_GENERATION_LIMIT = 4000
+CROSSOVER_RATE = 0.8
+MUTATION_RATE = 0.25
 TOURNAMENT_SIZE = 2
-ELITISM_RATIO = 0.02
+ELITISM_RATIO = 0.05
 
 # GEP Parameters
 HEAD_LENGTH = 6
@@ -146,7 +139,7 @@ def run_ga_iteration(iteration_num):
     :param iteration_num: Current iteration number for tracking
     :return: Dictionary with results from the iteration
     """
-    global interrupted
+    verbose = (ITERATIONS == 1)
 
     population = toolbox.population(n=POPULATION_SIZE)
 
@@ -176,16 +169,11 @@ def run_ga_iteration(iteration_num):
         offspring = []
 
         for i in range(0, len(parents)-1, 2):
-            if interrupted:
-                break
             if np.random.random() < CROSSOVER_RATE:
                 child1, child2 = toolbox.crossover(parents[i], parents[i+1])
                 offspring.extend([child1, child2])
             else:
                 offspring.extend([toolbox.clone(parents[i]), toolbox.clone(parents[i+1])])
-
-        if interrupted:
-            break
 
         # odd number of parents
         if len(parents) % 2:
@@ -206,23 +194,22 @@ def run_ga_iteration(iteration_num):
         hof.update(population)
         record = stats.compile(population)
 
-        if generation % 1 == 0 and generation > 0:
+        if verbose and generation % 1 == 0 and generation > 0:
             print(f"  Gen {generation}: best={record['max']:.4f}, avg={record['avg']:.4f}")
+        elif generation % 50 == 0:
+            print(f"  Iteration {iteration_num} Gen {generation}: best={record['max']:.4f}, avg={record['avg']:.4f}")
 
         if record['max'] >= 0.9999:
             perfect_found = True
             generation += 1
-            print(f"  Perfect solution found at generation {generation}!")
+            print(f"  Perfect solution found at generation {generation} for iteration {iteration_num}!")
             break
 
         generation += 1
 
     best_ind = hof[0]
 
-    if interrupted:
-        print(f"  Interrupted at generation {generation}. Best fitness: {best_ind.fitness.values[0]:.4f}")
-    elif not perfect_found:
-        print(f"  Completed {generation} generations. Best fitness: {best_ind.fitness.values[0]:.4f}")
+    print(f"  Completed iteration {iteration_num} with {generation} generations. Best fitness: {best_ind.fitness.values[0]:.4f}")
 
     return {
         'iteration': iteration_num,
@@ -243,21 +230,22 @@ if __name__ == "__main__":
     results = []
 
     try:
-        results = [run_ga_iteration(ITERATIONS)]
+        if ITERATIONS == 1:
+            results = [run_ga_iteration(1)]
+        else:
+            with Pool(processes=CORES, initializer=init_worker) as pool:
+                results = pool.map(run_ga_iteration, range(1, ITERATIONS + 1))
 
     except KeyboardInterrupt:
         print("\nKeyboard interrupt detected!")
-        results = []
     finally:
         print("=" * 60)
         perfect_count = sum(1 for r in results if r['perfect_found'])
-        print(f"Completed: {perfect_count}/{ITERATIONS} perfect solutions")
+        print(f"Completed: {perfect_count}/{len(results)} perfect solutions")
         print(f"Saving results to JSON...")
 
-        # Calculate accuracy (percentage of perfect solutions)
-        perfect_count = sum(1 for r in results if r['perfect_found'])
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"txor_h{HEAD_LENGTH}_s{perfect_count}_n{ITERATIONS}_c{CROSSOVER_RATE}_m{MUTATION_RATE}_{timestamp}.json"
+        filename = f"txor_0_-2_h{HEAD_LENGTH}_s{perfect_count}_n{len(results)}_c{CROSSOVER_RATE}_m{MUTATION_RATE}_{timestamp}.json"
 
         filepath = os.path.join(os.path.dirname(__file__), filename)
 
