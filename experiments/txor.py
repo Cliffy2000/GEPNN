@@ -18,22 +18,22 @@ import signal
 # ==================================================
 
 # Experiment Parameters
-ITERATIONS = 25
-CORES = 12
+ITERATIONS = 100
+CORES = 20
 
 # GA Parameters
 POPULATION_SIZE = 250
-MAX_GENERATION_LIMIT = 4000
+MAX_GENERATION_LIMIT = 2000
 CROSSOVER_RATE = 0.8
 MUTATION_RATE = 0.25
 TOURNAMENT_SIZE = 2
 ELITISM_RATIO = 0.05
 
 # GEP Parameters
-HEAD_LENGTH = 6
+HEAD_LENGTH = 5
 NUM_INPUTS = 1
-NUM_WEIGHTS = 6    # all nodes apart from the root node need a weight
-NUM_BIASES = 6     # all head nodes need a bias
+NUM_WEIGHTS = HEAD_LENGTH    # all nodes apart from the root node need a weight
+NUM_BIASES = HEAD_LENGTH     # all head nodes need a bias
 
 # ==================================================
 
@@ -245,7 +245,7 @@ if __name__ == "__main__":
         print(f"Saving results to JSON...")
 
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"txor_0_-2_h{HEAD_LENGTH}_s{perfect_count}_n{len(results)}_c{CROSSOVER_RATE}_m{MUTATION_RATE}_{timestamp}.json"
+        filename = f"txor_0.5acc_0_-1_h{HEAD_LENGTH}_s{perfect_count}_n{len(results)}_c{CROSSOVER_RATE}_m{MUTATION_RATE}_{timestamp}.json"
 
         filepath = os.path.join(os.path.dirname(__file__), filename)
 

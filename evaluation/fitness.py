@@ -266,9 +266,11 @@ def evaluate_xor(individual):
         return (0.0,)
 
     # Hybrid fitness: weighted combination of MSE and accuracy
-    w_mse = 0.7
-    w_acc = 0.3
-    fitness = w_mse * (1 - mse) + w_acc * accuracy
+    w_mse = 0.5
+    w_acc = 0.5
+    #fitness = w_mse * (1 - mse) + w_acc * accuracy
+    mse_component = max(0, 1 - 4 * mse)
+    fitness = w_mse * mse_component + w_acc * accuracy
 
     return (fitness,)
 
@@ -320,7 +322,7 @@ def evaluate_txor(individual):
             if t >= k:
                 # XOR of t-1 and t-2
                 # change for difficulty level
-                targets = np.logical_xor(sequences[:, t - 2], sequences[:, t]).astype(np.float32)
+                targets = np.logical_xor(sequences[:, t - 1], sequences[:, t]).astype(np.float32)
 
                 # MSE
                 squared_errors = (targets - outputs) ** 2
@@ -337,10 +339,12 @@ def evaluate_txor(individual):
         accuracy = correct / total_predictions if total_predictions > 0 else 0.0
 
         # Hybrid fitness
-        w_mse = 0.7
-        w_acc = 0.3
+        w_mse = 0.5
+        w_acc = 0.5
         # fitness = w_mse * (1 - mse) + w_acc * accuracy
-        fitness = accuracy
+        # fitness = accuracy
+        mse_component = max(0.0, 1 - 4 * mse)
+        fitness = w_mse * mse_component + w_acc * accuracy
 
     except Exception as e:
         print(f"Evaluation error: {e}")

@@ -27,16 +27,16 @@ CORES = 20
 # GA Parameters
 POPULATION_SIZE = 250
 MAX_GENERATION_LIMIT = 1000
-CROSSOVER_RATE = 0.85
-MUTATION_RATE = 0.15
+CROSSOVER_RATE = 0.8
+MUTATION_RATE = 0.35
 TOURNAMENT_SIZE = 2
-ELITISM_RATIO = 0.02
+ELITISM_RATIO = 0.04
 
 # GEP Parameters
 HEAD_LENGTH = 6    # tail length = 8 * (2 - 1) + 1 = 9
 NUM_INPUTS = 2
-NUM_WEIGHTS = 12    # all nodes apart from the root node need a weight
-NUM_BIASES = 6     # all head nodes need a bias
+NUM_WEIGHTS = HEAD_LENGTH * NUM_INPUTS    # all nodes apart from the root node need a weight
+NUM_BIASES = HEAD_LENGTH     # all head nodes need a bias
 
 # ==================================================
 
@@ -279,7 +279,7 @@ if __name__ == "__main__":
         # Calculate accuracy (percentage of perfect solutions)
         perfect_count = sum(1 for r in results if r['perfect_found'])
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"xor_h{HEAD_LENGTH}_s{perfect_count}_n{ITERATIONS}_c{CROSSOVER_RATE}_m{MUTATION_RATE}_{timestamp}.json"
+        filename = f"xor_0.5acc_h{HEAD_LENGTH}_s{perfect_count}_n{ITERATIONS}_c{CROSSOVER_RATE}_m{MUTATION_RATE}_{timestamp}.json"
 
         filepath = os.path.join(os.path.dirname(__file__), filename)
 

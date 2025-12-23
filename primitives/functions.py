@@ -70,8 +70,8 @@ def get_functions():
         (relu1, 1),
 
         # Binary functions
-        (and_f, 2),
-        (or_f, 2),
+        # (and_f, 2),
+        # (or_f, 2),
         (add, 2),
         (subtract, 2),
         (multiply, 2),
@@ -80,10 +80,10 @@ def get_functions():
         (sigmoid, 2),
 
         # Ternary functions
-        (add3, 3),
-        (relu3, 3),
-        (tanh3, 3),
-        (sigmoid3, 3),
+        # (add3, 3),
+        # (relu3, 3),
+        # (tanh3, 3),
+        # (sigmoid3, 3),
     ]
 
 
@@ -99,8 +99,8 @@ def get_functions_xor():
         (add, 2),
         (subtract, 2),
         (multiply, 2),
-        (and_f, 2),
-        (or_f, 2),
+        #(and_f, 2),
+        #(or_f, 2),
 
         # Binary activations
         (sigmoid, 2),

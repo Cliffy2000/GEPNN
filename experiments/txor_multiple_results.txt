@@ -1,0 +1,5 @@
+XOR Experiment Results 
+====================== 
+Started: Tue 12/23/2025 10:36:28.66 
+ 
+HEAD_LENGTH, MUTATION_RATE, PERFECT_COUNT 
