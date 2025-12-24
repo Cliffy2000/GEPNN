@@ -339,7 +339,7 @@ if __name__ == "__main__":
             print(f"Saving results to JSON...")
 
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"txor_0.5acc_h{HEAD_LENGTH}_t{T1}_{T2}_s{perfect_count}_n{ITERATIONS}_c{CROSSOVER_RATE}_m{MUTATION_RATE}_{timestamp}.json"
+            filename = f"txor_0.5acc_h{HEAD_LENGTH}_t{T1}_{T2}_s{perfect_count}_n{ITERATIONS}_c{CROSSOVER_RATE:.2f}_m{MUTATION_RATE:.2f}_{timestamp}.json"
 
             filepath = os.path.join(os.path.dirname(__file__), 'txor\\', filename)
 
