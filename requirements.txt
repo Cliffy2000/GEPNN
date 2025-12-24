@@ -2,3 +2,4 @@ numpy
 torch
 deap
 tqdm
+scikit-learn

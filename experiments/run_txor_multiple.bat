@@ -11,7 +11,7 @@ echo Started: %date% %time% >> %LOG_FILE%
 echo. >> %LOG_FILE%
 echo HEAD_LENGTH, MUTATION_RATE, PERFECT_COUNT >> %LOG_FILE%
 
-for %%h in (5 6 7) do (
+for %%h in (10) do (
     for %%m in (0.25 0.3 0.35 0.4) do (
         echo ========================================
         echo Running: HEAD_LENGTH=%%h, MUTATION_RATE=%%m

@@ -322,7 +322,7 @@ def evaluate_txor(individual):
             if t >= k:
                 # XOR of t-1 and t-2
                 # change for difficulty level
-                targets = np.logical_xor(sequences[:, t - 1], sequences[:, t]).astype(np.float32)
+                targets = np.logical_xor(sequences[:, t - 2], sequences[:, t]).astype(np.float32)
 
                 # MSE
                 squared_errors = (targets - outputs) ** 2

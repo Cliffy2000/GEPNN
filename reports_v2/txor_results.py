@@ -1,29 +1,40 @@
-import json
 import os
+import json
 import glob
+import argparse
 import numpy as np
 
 
-def analyze_xor_results():
-    # Get the directory where this script is located
+def parse_args():
+    parser = argparse.ArgumentParser(description='Analyze T-XOR Results')
+    parser.add_argument('--t1', type=int, default=0, help='First timestep offset')
+    parser.add_argument('--t2', type=int, default=-1, help='Second timestep offset')
+    return parser.parse_args()
+
+
+def analyze_txor_results(t1, t2):
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    # Go up one level and into experiments folder
-    experiments_dir = os.path.join(script_dir, "..", "experiments")
+    experiments_dir = os.path.join(script_dir, "..", "experiments_v2", "txor")
+
+    # Match files with specific t1, t2 pattern
+    pattern = os.path.join(experiments_dir, f"txor_*_t{t1}_{t2}_*.json")
 
     results = []
 
-    for filepath in glob.glob(os.path.join(experiments_dir, "txor_0.5acc_-1_-2*_n100_*.json")):
+    for filepath in glob.glob(pattern):
         with open(filepath, 'r') as f:
             data = json.load(f)
 
         params = data['parameters']
+
+        # Verify t1, t2 match (in case filename pattern isn't enough)
+        if params.get('t1') != t1 or params.get('t2') != t2:
+            continue
+
         head = params['head_length']
         mutation = params['mutation_rate']
 
-        # Extract generations for successful runs
         gens = [r['generations'] for r in data['results'] if r['perfect_found']]
-
-        # Count solutions found within 1000 generations
         gens_under_1000 = [g for g in gens if g <= 1000]
 
         results.append({
@@ -37,12 +48,17 @@ def analyze_xor_results():
             'max_gens': np.max(gens) if gens else None,
         })
 
-    # Sort by head_length, then mutation_rate
     results.sort(key=lambda x: (x['head_length'], x['mutation_rate']))
 
-    # Print table
+    print(f"T-XOR Results (t1={t1}, t2={t2})")
+    print("=" * 62)
     print(f"{'HEAD':<6} {'MUT':<6} {'SUCCESS':<8} {'<1000':<8} {'MEAN':<8} {'MEDIAN':<8} {'MIN':<6} {'MAX':<6}")
     print("-" * 62)
+
+    if not results:
+        print("No matching results found.")
+        return
+
     for r in results:
         mean = f"{r['mean_gens']:.1f}" if r['mean_gens'] else "N/A"
         median = f"{r['median_gens']:.1f}" if r['median_gens'] else "N/A"
@@ -52,5 +68,6 @@ def analyze_xor_results():
         print(f"{r['head_length']:<6} {r['mutation_rate']:<6} {r['success_rate'] * 100:<8.0f} {under_1000:<8} {mean:<8} {median:<8} {min_g:<6} {max_g:<6}")
 
 
-if __name__ == "__main__":
-    analyze_xor_results()
+if __name__ == '__main__':
+    args = parse_args()
+    analyze_txor_results(args.t1, args.t2)
