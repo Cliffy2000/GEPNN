@@ -17,7 +17,7 @@ def analyze_txor_results(t1, t2):
     experiments_dir = os.path.join(script_dir, "..", "experiments_v2", "txor")
 
     # Match files with specific t1, t2 pattern
-    pattern = os.path.join(experiments_dir, f"txor_*_t{t1}_{t2}_*.json")
+    pattern = os.path.join(experiments_dir, f"txor_0*t{t1}_{t2}_*.json")
 
     results = []
 

@@ -37,7 +37,7 @@ CORES = 20
 
 # GA Parameters
 POPULATION_SIZE = 250
-MAX_GENERATION_LIMIT = 3000
+MAX_GENERATION_LIMIT = 1000
 CROSSOVER_RATE = 0.8
 MUTATION_RATE = 0.35
 TOURNAMENT_SIZE = 2
@@ -114,7 +114,7 @@ def apply_args(args):
 apply_args(parse_args())
 
 # Derived parameters
-NUM_WEIGHTS = HEAD_LENGTH * NUM_INPUTS
+NUM_WEIGHTS = HEAD_LENGTH * 2   # max arity
 NUM_BIASES = HEAD_LENGTH
 
 

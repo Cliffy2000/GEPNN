@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 import collections
-from core.individual import Individual
+from core.individual_v2 import Individual_v2
 from primitives.functions import get_functions
 from primitives.terminals import InputTerminal, IndexTerminal
 
@@ -21,7 +21,7 @@ class Network:
     """
     Updated Class that stors node information in separate arrays and uses numpy for ops
     """
-    def __init__(self, individual: Individual):
+    def __init__(self, individual: Individual_v2):
         self.func_arity = _get_func_arity()
         self.expression = individual.expression
         self.num_inputs = individual.num_inputs

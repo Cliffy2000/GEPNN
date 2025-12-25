@@ -4,12 +4,12 @@ echo XOR Experiments
 echo Started: %date% %time%
 echo.
 
-for %%h in (3 4 5 6) do (
-    for %%m in (0.15 0.2 0.25 0.3 0.35) do (
+for %%h in (2) do (
+    for %%m in (0.4) do (
         echo ============================================================
         echo.
         echo Running: HEAD=%%h, MUTATION=%%m
-        python xor.py --head %%h --mutation %%m --quiet
+        python xor_sync.py --head %%h --mutation %%m --quiet
         echo.
         echo.
     )

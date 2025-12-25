@@ -10,7 +10,7 @@ def analyze_xor_results():
 
     results = []
 
-    for filepath in glob.glob(os.path.join(experiments_dir, "xor_*.json")):
+    for filepath in glob.glob(os.path.join(experiments_dir, "xor_sy*.json")):
         with open(filepath, 'r') as f:
             data = json.load(f)
 

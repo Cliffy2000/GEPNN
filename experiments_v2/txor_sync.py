@@ -23,9 +23,9 @@ import multiprocessing as mp
 from multiprocessing import Pool, Value
 from deap import base, creator, tools
 from tqdm import tqdm
-from core.individual_v2 import Individual_v2_xor
-from core.operators_v2 import crossover_sync, mutate_v2_xor
-from evaluation.fitness_v2 import evaluate_xor
+from core.individual_v2 import Individual_v2
+from core.operators_v2 import crossover_sync, mutate_v2
+from evaluation.fitness_v2 import evaluate_txor
 
 # ==================================================
 # Default Parameters
@@ -45,7 +45,11 @@ ELITISM_RATIO = 0.04
 
 # GEP Parameters
 HEAD_LENGTH = 6
-NUM_INPUTS = 2
+NUM_INPUTS = 1
+
+# T-XOR Parameters
+T1 = 0
+T2 = -1
 
 # Output control
 QUIET = False
@@ -60,7 +64,7 @@ success_count = None
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='XOR Evolution Experiment')
+    parser = argparse.ArgumentParser(description='T-XOR Evolution Experiment')
 
     parser.add_argument('--iterations', type=int)
     parser.add_argument('--cores', type=int)
@@ -70,6 +74,8 @@ def parse_args():
     parser.add_argument('--mutation', type=float)
     parser.add_argument('--elitism', type=float)
     parser.add_argument('--head', type=int)
+    parser.add_argument('--t1', type=int, help='First timestep offset (e.g., 0 or -1)')
+    parser.add_argument('--t2', type=int, help='Second timestep offset (e.g., -1 or -2)')
     parser.add_argument('--quiet', action='store_true')
 
     return parser.parse_args()
@@ -77,7 +83,8 @@ def parse_args():
 
 def apply_args(args):
     global ITERATIONS, CORES, POPULATION_SIZE, MAX_GENERATION_LIMIT
-    global CROSSOVER_RATE, MUTATION_RATE, ELITISM_RATIO, HEAD_LENGTH, QUIET
+    global CROSSOVER_RATE, MUTATION_RATE, ELITISM_RATIO, HEAD_LENGTH
+    global T1, T2, QUIET
 
     if args.iterations is not None:
         ITERATIONS = args.iterations
@@ -95,6 +102,10 @@ def apply_args(args):
         ELITISM_RATIO = args.elitism
     if args.head is not None:
         HEAD_LENGTH = args.head
+    if args.t1 is not None:
+        T1 = args.t1
+    if args.t2 is not None:
+        T2 = args.t2
     if args.quiet:
         QUIET = True
 
@@ -157,7 +168,7 @@ def crossover_wrapper(indv1, indv2):
 
 
 def mutation_wrapper(indv):
-    mutated = mutate_v2_xor(indv, MUTATION_RATE)
+    mutated = mutate_v2(indv, MUTATION_RATE)
 
     new_indv = creator.GEPIndividual(
         head_length=HEAD_LENGTH,
@@ -172,13 +183,13 @@ def mutation_wrapper(indv):
 
 
 creator.create("FitnessMax", base.Fitness, weights=(1.0,))
-creator.create("GEPIndividual", Individual_v2_xor, fitness=creator.FitnessMax)
+creator.create("GEPIndividual", Individual_v2, fitness=creator.FitnessMax)
 
 toolbox = base.Toolbox()
 toolbox.register("map", map)
 toolbox.register("individual", create_individual_wrapper)
 toolbox.register("population", tools.initRepeat, list, toolbox.individual)
-toolbox.register("evaluate", evaluate_xor)
+toolbox.register("evaluate", evaluate_txor, t1=T1, t2=T2)
 toolbox.register("select", tools.selRoulette)
 toolbox.register("crossover", crossover_wrapper)
 toolbox.register("mutate", mutation_wrapper)
@@ -285,8 +296,8 @@ def run_ga_iteration(iteration_num):
 
 if __name__ == "__main__":
     print("-" * 40)
-    print(f"XOR Evolution - {ITERATIONS} iterations")
-    print(f"Population: {POPULATION_SIZE}, Cores: {CORES}")
+    print(f"T-XOR Evolution - {ITERATIONS} iterations")
+    print(f"T-XOR({T1}, {T2}) | Population: {POPULATION_SIZE}, Cores: {CORES}")
     print("-" * 40)
 
     results = []
@@ -341,9 +352,9 @@ if __name__ == "__main__":
             print(f"Saving results to JSON...")
 
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"xor_sync_0.5acc_h{HEAD_LENGTH}_s{perfect_count}_n{ITERATIONS}_c{CROSSOVER_RATE:.2f}_m{MUTATION_RATE:.2f}_{timestamp}.json"
+            filename = f"txor_sync_0.5acc_h{HEAD_LENGTH}_t{T1}_{T2}_s{perfect_count}_n{ITERATIONS}_c{CROSSOVER_RATE:.2f}_m{MUTATION_RATE:.2f}_{timestamp}.json"
 
-            filepath = os.path.join(os.path.dirname(__file__), 'xor\\', filename)
+            filepath = os.path.join(os.path.dirname(__file__), 'txor', filename)
 
             json_results = []
             for r in results:
@@ -369,7 +380,9 @@ if __name__ == "__main__":
                         'mutation_rate': MUTATION_RATE,
                         'tournament_size': TOURNAMENT_SIZE,
                         'elitism_ratio': ELITISM_RATIO,
-                        'head_length': HEAD_LENGTH
+                        'head_length': HEAD_LENGTH,
+                        't1': T1,
+                        't2': T2
                     },
                     'results': json_results
                 }, f, indent=2)

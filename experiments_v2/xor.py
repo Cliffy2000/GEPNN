@@ -103,7 +103,7 @@ def apply_args(args):
 apply_args(parse_args())
 
 # Derived parameters
-NUM_WEIGHTS = HEAD_LENGTH * NUM_INPUTS
+NUM_WEIGHTS = HEAD_LENGTH * 2
 NUM_BIASES = HEAD_LENGTH
 
 
