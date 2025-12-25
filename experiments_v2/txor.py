@@ -1,6 +1,17 @@
 import sys
 import os
 
+# Reset CPU affinity (cluster/JupyterHub fix)
+try:
+    os.sched_setaffinity(0, set(range(os.cpu_count())))
+except:
+    pass
+
+# Thread limiting for NumPy
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import json
@@ -26,7 +37,7 @@ CORES = 20
 
 # GA Parameters
 POPULATION_SIZE = 250
-MAX_GENERATION_LIMIT = 2000
+MAX_GENERATION_LIMIT = 3000
 CROSSOVER_RATE = 0.8
 MUTATION_RATE = 0.35
 TOURNAMENT_SIZE = 2
@@ -113,6 +124,12 @@ def init_worker(event, counter, success):
     completed_count = counter
     success_count = success
     signal.signal(signal.SIGINT, signal.SIG_IGN)
+
+    # Reset CPU affinity for worker
+    try:
+        os.sched_setaffinity(0, set(range(os.cpu_count())))
+    except:
+        pass
 
 
 def create_individual_wrapper():
@@ -341,7 +358,7 @@ if __name__ == "__main__":
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"txor_0.5acc_h{HEAD_LENGTH}_t{T1}_{T2}_s{perfect_count}_n{ITERATIONS}_c{CROSSOVER_RATE:.2f}_m{MUTATION_RATE:.2f}_{timestamp}.json"
 
-            filepath = os.path.join(os.path.dirname(__file__), 'txor\\', filename)
+            filepath = os.path.join(os.path.dirname(__file__), 'txor', filename)
 
             json_results = []
             for r in results:

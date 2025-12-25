@@ -1,6 +1,17 @@
 import sys
 import os
 
+# Reset CPU affinity (cluster/JupyterHub fix)
+try:
+    os.sched_setaffinity(0, set(range(os.cpu_count())))
+except:
+    pass
+
+# Thread limiting for NumPy
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import json
@@ -102,6 +113,12 @@ def init_worker(event, counter, success):
     completed_count = counter
     success_count = success
     signal.signal(signal.SIGINT, signal.SIG_IGN)
+
+    # Reset CPU affinity for worker
+    try:
+        os.sched_setaffinity(0, set(range(os.cpu_count())))
+    except:
+        pass
 
 
 def create_individual_wrapper():
