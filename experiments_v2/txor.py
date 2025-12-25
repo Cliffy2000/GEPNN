@@ -236,11 +236,8 @@ def run_ga_iteration(iteration_num):
             if shutdown_event is not None and shutdown_event.is_set():
                 interrupted = True
                 break
-            if np.random.random() < CROSSOVER_RATE:
-                child1, child2 = toolbox.crossover(parents[i], parents[i + 1])
-                offspring.extend([child1, child2])
-            else:
-                offspring.extend([toolbox.clone(parents[i]), toolbox.clone(parents[i + 1])])
+            child1, child2 = toolbox.crossover(parents[i], parents[i + 1])
+            offspring.extend([child1, child2])
 
         if interrupted:
             break
@@ -249,8 +246,7 @@ def run_ga_iteration(iteration_num):
             offspring.append(toolbox.clone(parents[-1]))
 
         for i in range(len(offspring)):
-            if np.random.random() < MUTATION_RATE:
-                offspring[i] = toolbox.mutate(offspring[i])[0]
+            offspring[i] = toolbox.mutate(offspring[i])[0]
 
         invalid_indv = [indv for indv in offspring if not indv.fitness.valid]
         fitnesses = toolbox.map(toolbox.evaluate, invalid_indv)

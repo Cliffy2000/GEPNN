@@ -1,5 +1,5 @@
 import random
-from primitives.functions import get_functions, get_functions_xor
+from primitives.functions import get_functions
 from primitives.terminals import get_input_terminals, get_index_terminals
 
 
@@ -29,7 +29,7 @@ def _get_symbols_non_temporal(head_length, num_inputs):
     key = (head_length, num_inputs)
 
     if key not in _cache_non_temporal:
-        functions = [f for f, _ in get_functions_xor()]
+        functions = [f for f, _ in get_functions()]
         inputs = get_input_terminals(num_inputs)
 
         head_pool = functions + inputs  # Functions + inputs
@@ -61,6 +61,69 @@ def crossover_one_point(indv1, indv2, crossover_rate):
         return new_gene1, new_gene2
 
     return gene1, gene2
+
+
+def crossover_sync(indv1, indv2, crossover_rate):
+    """
+    Synchronized crossover that maintains structure-parameter pairing.
+
+    When structural components are exchanged at a crossover point, the
+    associated weights (edge weights) and biases are exchanged together.
+    This preserves learned parameter associations.
+
+    Weight indexing: weight[i] corresponds to edge leading to node i (with
+    placeholder at index 0). Weights array has length = head_length + tail_length.
+
+    Bias indexing: bias[i] corresponds to head position i. Biases array has
+    length = head_length. Only biases at positions containing functions are active.
+
+    :param indv1: parent 1
+    :param indv2: parent 2
+    :param crossover_rate: the probability that a crossover is performed
+    :return: the genes of offspring1 and offspring2
+    """
+    if random.random() >= crossover_rate:
+        return indv1.gene, indv2.gene
+
+    # Structure region: head + tail
+    struct_length = indv1.head_length + indv1.tail_length
+
+    # Choose crossover point in structure (at least 1 from each end)
+    struct_point = random.randint(1, struct_length - 1)
+
+    # Extract structures
+    struct1 = indv1.gene[:struct_length]
+    struct2 = indv2.gene[:struct_length]
+
+    # Create new structures
+    new_struct1 = struct1[:struct_point] + struct2[struct_point:]
+    new_struct2 = struct2[:struct_point] + struct1[struct_point:]
+
+    # Weights: weight[i] corresponds to node i+1 (node 0 has no incoming edge)
+    # So crossover at struct_point means swap weights from index struct_point-1 onward
+    weight_point = max(0, struct_point - 1)
+
+    weights1 = list(indv1.weights)
+    weights2 = list(indv2.weights)
+
+    new_weights1 = weights1[:weight_point] + weights2[weight_point:]
+    new_weights2 = weights2[:weight_point] + weights1[weight_point:]
+
+    # Biases: length = head_length, indexed by head position
+    # Crossover at same point, but capped to head_length
+    bias_point = min(struct_point, indv1.head_length)
+
+    biases1 = list(indv1.biases)
+    biases2 = list(indv2.biases)
+
+    new_biases1 = biases1[:bias_point] + biases2[bias_point:]
+    new_biases2 = biases2[:bias_point] + biases1[bias_point:]
+
+    # Combine into full genes
+    new_gene1 = new_struct1 + new_weights1 + new_biases1
+    new_gene2 = new_struct2 + new_weights2 + new_biases2
+
+    return new_gene1, new_gene2
 
 
 def mutate_v2(indv, mutation_rate):

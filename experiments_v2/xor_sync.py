@@ -24,7 +24,7 @@ from multiprocessing import Pool, Value
 from deap import base, creator, tools
 from tqdm import tqdm
 from core.individual_v2 import Individual_v2_xor
-from core.operators_v2 import crossover_one_point, mutate_v2_xor
+from core.operators_v2 import crossover_sync, mutate_v2_xor
 from evaluation.fitness_v2 import evaluate_xor
 
 # ==================================================
@@ -133,7 +133,7 @@ def create_individual_wrapper():
 
 
 def crossover_wrapper(indv1, indv2):
-    offspring1, offspring2 = crossover_one_point(indv1, indv2, CROSSOVER_RATE)
+    offspring1, offspring2 = crossover_sync(indv1, indv2, CROSSOVER_RATE)
 
     new_indv1 = creator.GEPIndividual(
         head_length=HEAD_LENGTH,
@@ -341,7 +341,7 @@ if __name__ == "__main__":
             print(f"Saving results to JSON...")
 
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"xor_0.5acc_h{HEAD_LENGTH}_s{perfect_count}_n{ITERATIONS}_c{CROSSOVER_RATE:.2f}_m{MUTATION_RATE:.2f}_{timestamp}.json"
+            filename = f"xor_sync_0.5acc_h{HEAD_LENGTH}_s{perfect_count}_n{ITERATIONS}_c{CROSSOVER_RATE:.2f}_m{MUTATION_RATE:.2f}_{timestamp}.json"
 
             filepath = os.path.join(os.path.dirname(__file__), 'xor\\', filename)
 
