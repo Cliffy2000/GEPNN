@@ -5,9 +5,9 @@ echo Started: %date% %time%
 echo.
 
 set T1=0
-set T2=-1
+set T2=-2
 
-for %%h in (2) do (
+for %%h in (3 4 5 6 7) do (
     for %%m in (0.15 0.2 0.25 0.3) do (
         echo ============================================================
         echo Running: HEAD=%%h, MUTATION=%%m, T1=%T1%, T2=%T2%
