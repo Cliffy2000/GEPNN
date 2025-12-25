@@ -1,5 +1,5 @@
 import random
-from primitives.functions import get_functions
+from primitives.functions import get_functions, get_functions_xor
 from primitives.terminals import get_input_terminals, get_index_terminals
 
 
@@ -29,7 +29,7 @@ def _get_symbols_non_temporal(head_length, num_inputs):
     key = (head_length, num_inputs)
 
     if key not in _cache_non_temporal:
-        functions = [f for f, _ in get_functions()]
+        functions = [f for f, _ in get_functions_xor()]
         inputs = get_input_terminals(num_inputs)
 
         head_pool = functions + inputs  # Functions + inputs
