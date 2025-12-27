@@ -104,6 +104,58 @@ def evaluate_xor(individual):
     return (fitness,)
 
 
+def evaluate_xor_v2(individual):
+    """
+    Evaluate individual on XOR using all 24 permutations of the 4 cases.
+    Each permutation is a separate sequence, processed in parallel.
+    """
+    from itertools import permutations
+
+    X_base = np.array([[0, 0], [0, 1], [1, 0], [1, 1]], dtype=np.float32)
+    y_base = np.array([0, 1, 1, 0], dtype=np.float32)
+
+    # All 24 permutations
+    perms = list(permutations(range(4)))
+    batch_size = 24
+    seq_length = 4
+
+    try:
+        network = Network(individual)
+    except:
+        return (0.0,)
+
+    try:
+        network.prev_values = None
+
+        total_squared_error = 0.0
+        correct = 0
+        total = batch_size * seq_length
+
+        for t in range(seq_length):
+            # Gather the t-th element from each permutation
+            indices = [perm[t] for perm in perms]
+            inputs = X_base[indices]  # Shape: (24, 2)
+            targets = y_base[indices]  # Shape: (24,)
+
+            outputs = network.forward(inputs)
+            outputs = np.clip(outputs, 0.001, 0.999)
+
+            total_squared_error += np.sum((targets - outputs) ** 2)
+            predictions = (outputs > 0.5).astype(int)
+            correct += np.sum(predictions == targets)
+
+        mse = total_squared_error / total
+        mse_component = max(0.0, 1.0 - 4.0 * mse)
+        accuracy = correct / total
+
+        fitness = 0.5 * mse_component + 0.5 * accuracy
+
+    except:
+        return (0.0,)
+
+    return (fitness,)
+
+
 def evaluate_txor(individual, t1=-1, t2=-2):
     """
     Evaluate individual on Temporal XOR task.
@@ -176,6 +228,53 @@ def evaluate_txor(individual, t1=-1, t2=-2):
 
     except Exception as e:
         print(f"Evaluation error: {e}")
+        return (0.0,)
+
+    return (fitness,)
+
+
+def evaluate_delay(individual, delay=1):
+    """
+    Evalutate individual on a delay regression task.
+    Output at a given timestep should be the value from specified timesteps ago
+    """
+    batch_size = 500
+    seq_length = 15
+
+    rng = np.random.default_rng(seed=42)
+    sequences = rng.uniform(-10, 10, size=(batch_size, seq_length)).astype(np.float32)
+
+    try:
+        network = Network(individual)
+    except:
+        return (0.0,)
+
+    try:
+        network.prev_values = None
+
+        all_outputs = []
+        all_targets = []
+
+        for t in range(seq_length):
+            inputs = sequences[:, t:t + 1]
+            outputs = network.forward(inputs)
+
+            if t >= delay:
+                targets = sequences[:, t - delay]
+                all_outputs.append(outputs)
+                all_targets.append(targets)
+
+        all_outputs = np.concatenate(all_outputs)
+        all_targets = np.concatenate(all_targets)
+
+        # R² score
+        ss_res = np.sum((all_targets - all_outputs) ** 2)
+        ss_tot = np.sum((all_targets - np.mean(all_targets)) ** 2)
+        r2 = 1 - (ss_res / ss_tot)
+
+        fitness = max(0.0, r2)
+
+    except:
         return (0.0,)
 
     return (fitness,)

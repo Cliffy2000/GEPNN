@@ -23,9 +23,12 @@ import multiprocessing as mp
 from multiprocessing import Pool, Value
 from deap import base, creator, tools
 from tqdm import tqdm
-from core.individual_v2 import Individual_v2_xor
+from core.individual_v2 import Individual_v2
 from core.operators_v2 import crossover_sync, mutate_v2_xor
-from evaluation.fitness_v2 import evaluate_xor
+from evaluation.fitness_v2 import evaluate_xor_v2
+
+import warnings
+warnings.filterwarnings('ignore', category=RuntimeWarning)
 
 # ==================================================
 # Default Parameters
@@ -37,7 +40,7 @@ CORES = 20
 
 # GA Parameters
 POPULATION_SIZE = 250
-MAX_GENERATION_LIMIT = 2000
+MAX_GENERATION_LIMIT = 1000
 CROSSOVER_RATE = 0.8
 MUTATION_RATE = 0.35
 TOURNAMENT_SIZE = 2
@@ -172,13 +175,13 @@ def mutation_wrapper(indv):
 
 
 creator.create("FitnessMax", base.Fitness, weights=(1.0,))
-creator.create("GEPIndividual", Individual_v2_xor, fitness=creator.FitnessMax)
+creator.create("GEPIndividual", Individual_v2, fitness=creator.FitnessMax)
 
 toolbox = base.Toolbox()
 toolbox.register("map", map)
 toolbox.register("individual", create_individual_wrapper)
 toolbox.register("population", tools.initRepeat, list, toolbox.individual)
-toolbox.register("evaluate", evaluate_xor)
+toolbox.register("evaluate", evaluate_xor_v2)
 toolbox.register("select", tools.selRoulette)
 toolbox.register("crossover", crossover_wrapper)
 toolbox.register("mutate", mutation_wrapper)
@@ -341,7 +344,7 @@ if __name__ == "__main__":
             print(f"Saving results to JSON...")
 
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"xor_sync_0.5acc_h{HEAD_LENGTH}_s{perfect_count}_n{ITERATIONS}_c{CROSSOVER_RATE:.2f}_m{MUTATION_RATE:.2f}_{timestamp}.json"
+            filename = f"xor_index_0.5acc_h{HEAD_LENGTH}_s{perfect_count}_n{ITERATIONS}_c{CROSSOVER_RATE:.2f}_m{MUTATION_RATE:.2f}_{timestamp}.json"
 
             filepath = os.path.join(os.path.dirname(__file__), 'xor\\', filename)
 

@@ -208,3 +208,53 @@ def mutate_v2_xor(indv, mutation_rate):
             new_coeff.append(indv.gene[indv.head_length + indv.tail_length + i])
 
     return new_head + new_tail + new_coeff
+
+
+def mutate_v2_reg(indv, mutation_rate):
+    """
+    Mutation for temporal tasks with Index Terminals in head and tail.
+
+    Follows traditional GEP (Ferreira 2001):
+    - Head: uniform probability across functions + terminals (inputs + indices)
+    - Tail: uniform probability across terminals (inputs + indices)
+    - Coefficients: Gaussian perturbation
+
+    :param indv: the original individual
+    :param mutation_rate: probability that a single allele is mutated
+    :return: the mutated gene
+    """
+    head_pool, tail_pool = _get_symbols_temporal(indv.head_length, indv.num_inputs)
+
+    # Head mutation: functions or terminals
+    new_head = []
+    for i in range(indv.head_length):
+        if random.random() < mutation_rate:
+            new_head.append(random.choice(head_pool))
+        else:
+            new_head.append(indv.gene[i])
+
+    # Tail mutation: terminals (inputs + indices)
+    new_tail = []
+    for i in range(indv.tail_length):
+        if random.random() < mutation_rate:
+            new_tail.append(random.choice(tail_pool))
+        else:
+            new_tail.append(indv.gene[indv.head_length + i])
+
+    # Coefficient mutation: Gaussian perturbation
+    new_coeff = []
+    for i in range(indv.num_weights + indv.num_biases):
+        if random.random() < mutation_rate:
+            base_sigma = 10 ** random.uniform(-2, 0)  # [0.01, 1.0]
+            old_val = indv.gene[indv.head_length + indv.tail_length + i]
+            if random.random() < 0.5:
+                sigma = base_sigma  # Fine-tuning: always small
+            else:
+                sigma = base_sigma * max(1.0, abs(old_val))  # Scaled by magnitude
+
+            new_val = old_val + random.gauss(0, sigma)
+            new_coeff.append(new_val)
+        else:
+            new_coeff.append(indv.gene[indv.head_length + indv.tail_length + i])
+
+    return new_head + new_tail + new_coeff
